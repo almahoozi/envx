@@ -1,0 +1,139 @@
+ENVX(1)                    User Commands                    ENVX(1)
+
+NAME
+       envx - Manage encrypted values in .env files and execute programs with decrypted environments
+
+SYNOPSIS
+       envx [COMMAND] [OPTIONS] [ARGUMENTS]
+
+DESCRIPTION
+       envx is a CLI tool for securely managing encrypted environment variables in .env files. It allows adding, retrieving, and modifying encrypted values, as well as executing programs with decrypted environments.
+
+COMMANDS
+       run [PROGRAM] [ARGUMENTS]...
+              Runs the specified program with the decrypted .env file.
+
+       add [VARIABLE=VALUE]...
+              Encrypts and adds one or more variables to the .env file.
+              Fails if the variable already exists.
+              Options:
+                -p, --print   Prints the encrypted variable without writing.
+
+       set [VARIABLE=VALUE]...
+              Encrypts and adds one or more variables to the .env file.
+              Overwrites existing values instead of failing.
+              Options:
+                -p, --print   Prints the new encrypted variable instead of writing.
+
+       remove [VARIABLE]...
+              Removes one or more variables from the .env file, whether encrypted or not.
+
+       get [VARIABLE]...
+              Retrieves one or more variables, decrypting if necessary.
+
+       env
+              Decrypts all variables and prints a formatted .env file, removing comments and extra spaces.
+              Options:
+                -w, --write   Overwrites the .env file with formatted contents.
+
+       decrypt
+              Prints the .env file as is, but with decrypted values.
+              Options:
+                -w, --write   Overwrites the file with decrypted values.
+
+       encrypt
+              Prints the .env file as is, but encrypts any unencrypted variables.
+              Options:
+                -w, --write   Overwrites the file with encrypted values.
+
+       load
+              (Planned for future versions) Loads environment variables from an external source (e.g., HashiCorp Vault) into an encrypted .env file.
+
+       config [SUBCOMMAND] [OPTIONS]
+              Manages global and per-project configurations.
+              Subcommands:
+                migrate       Migrates encryption keys/settings.
+                export        Exports the encryption key or certificate.
+                import        Imports an encryption key or certificate.
+                set KEY VALUE Sets a configuration value.
+                get KEY       Retrieves a configuration value.
+                remove KEY    Removes a configuration value.
+                list          Displays the current configuration.
+
+       track [FILE] [OPTIONS]
+              Manually adds a file to tracking for migration or key rotation.
+              Options:
+                --id=<xxx>    Assigns a custom ENVX_ID to the file.
+                -w, --write   Enables automatic movement detection via ENVX_ID.
+
+       untrack [FILE]
+              Removes a file from tracking.
+
+       list-files
+              Lists all tracked .env files.
+
+       rotate-key
+              Re-encrypts all secrets with a new encryption key.
+              Options:
+                --new-key=<file>  Uses a specified new key instead of generating one.
+                --backup=<file>   Creates a backup of the old .env file before re-encryption.
+
+       migrate [OPTIONS]
+              Moves secrets and encryption keys to another machine.
+              Options:
+                --export-key      Exports the key if permitted.
+                --import-key <file>  Imports an encryption key.
+                --file <file>     Specifies an alternative .env file to migrate.
+                --no-key          Skips key export/import (manual transfer required).
+
+OPTIONS
+       -n, --name <name>
+              Looks for .env.<name> instead of .env.
+
+       -f, --file <path>
+              Uses a specific file instead of the default.
+
+       -w, --write
+              Overwrites the target file where applicable.
+
+CONFIGURATION
+       - Global config stored in:
+         - Linux/Mac: $HOME/.config/envx/config.json
+         - Windows: %APPDATA%\envx\config.json
+       - Per-project config stored in .envx/config.json within the project directory.
+       - Config options:
+         - Default file resolution chain (.env.{x} then .env).
+         - Auto-write mode (-w enabled by default).
+         - Key management (global vs. per-project keys).
+         - External key sources (AWS KMS, Vault, etc.).
+         - Auto-tracking (can be disabled).
+         - File movement detection via ENVX_ID.
+
+ENCRYPTION & KEY MANAGEMENT
+       - Default: Auto-generated key stored in OS keychain (MacOS-only in v1).
+       - YubiKey support via PIV mode.
+       - Password-based encryption available (requires password on each run).
+       - Optional password caching agent.
+       - ECC (256-bit or 384-bit) default, RSA (2048-bit min, 3072-bit preferred) as alternative.
+       - No fallback if external key sources are unreachable.
+
+FILE TRACKING & MIGRATION
+       - envx automatically tracks encrypted files.
+       - Users can manually track/untrack files.
+       - ENVX_ID allows deduplication and movement detection (opt-in).
+
+EXIT STATUS
+       0   Successful execution.
+       1   Error occurred.
+
+SEE ALSO
+       pass(1), gpg(1), openssl(1)
+
+AUTHOR
+       Developed by [Your Name/Team]
+
+REPORTING BUGS
+       Report bugs to [GitHub/Email/Issue Tracker]
+
+COPYRIGHT
+       Copyright (C) [Year] [Your Organization]. Licensed under [License].
