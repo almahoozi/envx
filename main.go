@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -257,7 +256,6 @@ func encrypt(value string, key []byte) string {
 const (
 	app     = "envx"
 	service = "com.almahoozi.envx"
-	account = "default"
 )
 
 func loadKey() ([]byte, error) {
@@ -289,16 +287,7 @@ func loadKey() ([]byte, error) {
 }
 
 func getKey(account string) ([]byte, error) {
-	cmd := exec.Command("security", "find-generic-password",
-		"-s", service,
-		"-a", account,
-		"-w")
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := hex.DecodeString(strings.TrimSpace(string(out)))
+	_, key, err := getGenericPassword(service, account)
 	return key, err
 }
 
@@ -309,12 +298,5 @@ func createKey(account string) error {
 		return err
 	}
 
-	cmd := exec.Command("security", "add-generic-password",
-		"-l", app,
-		"-s", service,
-		"-a", account,
-		"-X", hex.EncodeToString(key),
-		//"-T", "/Users/hussam/Documents/Source/personal/keychain/envxx",
-	)
-	return cmd.Run()
+	return setGenericPassword(app, service, account, key)
 }

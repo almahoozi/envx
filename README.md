@@ -7,11 +7,13 @@ go install github.com/almahoozi/envx@latest
 Assuming `$GOPATH/bin` is in your `$PATH`, otherwise go do that.
 
 A nifty mechanism that I'm experimenting with is to automatically prepend the
-`go run` and `./*` commands with `envx` for convenience.
+`go run` and `./*` commands with `envx` for convenience. This is only done if
+there is a `.env` file in the current directory, and the current directory is
+not `envx` itself.
 
 ```bash
 function rewrite_buffer() {
-    if [[ "$BUFFER" == go\ run* || "$BUFFER" == ./* ]]; then
+    if [[ -f .env && "${PWD##*/}" != "envx" && ( "$BUFFER" == go\ run* || "$BUFFER" == ./* ) ]]; then
       BUFFER="envx $BUFFER"
     fi
 }

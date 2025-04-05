@@ -1,4 +1,4 @@
-.PHONY: all test clean build
+.PHONY: all build clean install test
 
 all: clean test build
 
@@ -7,5 +7,8 @@ build:
 
 clean:
 	rm ./bin/envx
+
+install:
+	go install github.com/almahoozi/envx@latest
 
 test:

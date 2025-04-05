@@ -1,2 +1,4 @@
 bin
+example
+.env
 .DS_Store
