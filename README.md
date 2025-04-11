@@ -32,3 +32,12 @@ A limited set of functionality is currently supported:
   would be decrypted. If the experimental mechanism above is enabled, `envx` will
   be implicitly prepended to the command; so you can just run `./bin/app` or
   `go run ./cmd/app`.
+
+### Global Flags
+
+- `-n` or `--name`: Name of the env file variant to be used. Appends .{name} to
+  the filename. Default is empty. Setting name to local for example will use
+  .env.local (if -f is default)
+- `-f` or `--file`: Name of the env file to be used. Default is .env. Setting
+  the name to .custom will use .custom as the env file. -n is appended to the
+  filename if set.

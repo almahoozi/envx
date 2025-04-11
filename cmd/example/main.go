@@ -11,4 +11,8 @@ func main() {
 	} else {
 		fmt.Println("VAL not set")
 	}
+
+	for i, arg := range os.Args {
+		fmt.Printf("arg[%d]: %s\n", i, arg)
+	}
 }

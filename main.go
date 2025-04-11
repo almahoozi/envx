@@ -11,10 +11,8 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"os/user"
 	"strings"
-	"syscall"
 )
 
 //go:embed envx.1
@@ -25,102 +23,21 @@ type envVar struct {
 	value string
 }
 
-func arg(i int) string {
-	if len(os.Args) > i {
-		return os.Args[i]
-	}
-	return ""
-}
-
 func main() {
-	if len(os.Args) < 2 {
-		name := arg(0)
-		fmt.Printf("Usage: %s <executable> [args]\n", name)
-		// TODO: Support options (ex: selecting the env file --env=dev|-e dev selects .env.dev)
-		// --file=x.env|-f x.env selects x.env
-		// --password|-p allows to set a password for encrypted values
-		// fmt.Printf("Usage: %s [options] <executable> [args]\n", name)
-		os.Exit(1)
-	}
-
-	i := 1
-
-	if cmd := arg(i); cmd == "help" || cmd == "man" {
-		log.Println(man)
-	}
-
-	// optimistically load encryption key
-	key, err := loadKey()
-	if err != nil {
-		log.Fatal("Error loading key:", err)
-	}
-
-	// Load .env file if exists
-	vars := loadEnv(key)
-
-	// If first arg is "encrypt" then encrypt the value
-	if arg(i) == "encrypt" {
-		var write bool
-		i++
-		if arg(i) == "-w" {
-			write = true
-			i++
-		}
-
-		for i, v := range vars {
-			// If it isn't already encrypted, encrypt it
-			// Well, we decrypted everything, so just encrypt everything
-			vars[i].value = encrypt(v.value, key)
-		}
-
-		output := ""
-		for _, v := range vars {
-			output += fmt.Sprintf("%s=%s\n", v.key, v.value)
-		}
-
-		if write {
-			err := os.WriteFile(".env", []byte(output), 0o644)
-			if err != nil {
-				fmt.Println("Error writing .env file:", err)
-			}
-		} else {
-			fmt.Println(output)
-		}
-
-		os.Exit(0)
-	}
-
-	execPath := arg(i)
-	args := os.Args[i:] // Pass all args as they are
-
-	for _, v := range vars {
-		os.Setenv(v.key, v.value)
-	}
-
-	// Execute the new process in place of the Go process
-	// TODO: execpath could be in the $PATH, not in the current directory
-	execPath, err = exec.LookPath(execPath)
-	if err != nil {
-		fmt.Println("Executable not found:", execPath)
-		os.Exit(1)
-	}
-
-	err = syscall.Exec(execPath, args, os.Environ())
-	if err != nil {
-		fmt.Println("Error executing process:", err, execPath, args)
+	if err := start(); err != nil {
+		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 }
 
-func loadEnv(decryptionKey []byte) (vars []envVar) {
-	name := ".env"
-
+func loadEnv(name string, decryptionKey []byte) (vars []envVar, err error) {
 	file, err := os.Open(name)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			fmt.Println("Error opening .env file:", err)
+			return nil, nil
 		}
-		return nil
+		return nil, err
 	}
 	defer file.Close()
 
@@ -158,7 +75,7 @@ func loadEnv(decryptionKey []byte) (vars []envVar) {
 		fmt.Println("Error reading .env file:", err)
 	}
 
-	return vars
+	return vars, nil
 }
 
 func decryptAES(key, ciphertext []byte) ([]byte, error) {
@@ -267,6 +184,8 @@ func loadKey() ([]byte, error) {
 	var key []byte
 	if key, err = getKey(user.Username); err != nil {
 		// if it simply doesn't exist create it
+		// FIX: We may error due to other reasons! We shouldn't overwrite the key!
+		// For example if we don't have permissions to access the keychain or the key.
 		log.Println("Key not found, creating new key")
 	}
 
