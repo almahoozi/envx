@@ -154,6 +154,17 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 		return fmt.Errorf("executable not found: %s", exe)
 	}
 
+	// TODO: Resolve shell alias
+	/*
+	  out, err := exec.Command("bash", "-i", "-c", "type "+exe).Output()
+	  // Example output: alias gs='git status'
+	  aliasPrefix := "alias " + exe + "="
+	  if strings.HasPrefix(outputStr, aliasPrefix) {
+	    aliasVal := strings.Trim(strings.TrimPrefix(outputStr, aliasPrefix), "'\" \n")
+	    // aliasVal now contains the resolved command, e.g., "git status"
+	  }
+	*/
+
 	err = syscall.Exec(exe, args, os.Environ())
 	if err != nil {
 		fmt.Println("Error executing process:", err, exe, args)

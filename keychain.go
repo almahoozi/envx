@@ -13,6 +13,9 @@ import (
 	"unsafe"
 )
 
+// IMPLEMENT: Use keys instead of passwords, and try to let the encryption happen
+// using the Secure Enclave.
+
 func setGenericPassword(label, service, account string, password []byte) error {
 	allocator := C.kCFAllocatorDefault
 	query := C.CFDictionaryCreateMutable(allocator, 0, nil, nil)
