@@ -62,13 +62,57 @@ func loadEnv(name string, decryptionKey []byte) (vars []envVar, err error) {
 		if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
 			value = value[1 : len(value)-1]
 		}
-		if plaintext, err := decrypt(value, decryptionKey); err != nil {
-			fmt.Println("Error decrypting value:", err)
-		} else {
-			value = plaintext
-		}
 
 		vars = append(vars, envVar{key, value})
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error reading .env file:", err)
+	}
+
+	return vars, nil
+}
+
+func loadDecryptedEnv(name string, decryptionKey []byte) (vars []envVar, err error) {
+	file, err := os.Open(name)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Println("Error opening .env file:", err)
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			// TODO: Support setting empty values
+			continue
+		}
+		// TODO: Support decoding base64 values
+		// TODO: Support decrypting encrypted values. Ask for password if any encrypted value is present.
+		// Can we make this a key-chain like experience? Or like just ask for the terminal user's password?
+		key, value := parts[0], parts[1]
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		// If value is enclosed in double quotes, remove them
+		if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
+			value = value[1 : len(value)-1]
+		}
+
+		plaintext, err := decrypt(value, decryptionKey)
+		if err != nil {
+			fmt.Println("Error decrypting value:", err)
+			return nil, err
+		}
+
+		vars = append(vars, envVar{key, plaintext})
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -146,17 +190,17 @@ func encryptAES(key, plaintext []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-func encrypt(value string, key []byte) string {
+func encrypt(value string, key []byte) (string, error) {
 	// If value is already encrypted, don't encrypt it again
 	if strings.HasPrefix(value, "envx") {
-		return value
+		return value, nil
 	}
 
 	plaintext := []byte(value)
 	ciphertext, err := encryptAES(key, plaintext)
 	if err != nil {
 		fmt.Println("Error encrypting value:", err)
-		return value
+		return value, err
 	}
 
 	// TODO: Instead of prepending envx directly, prepend a random byte which is
@@ -167,7 +211,7 @@ func encrypt(value string, key []byte) string {
 
 	ciphertext = append([]byte("envx"), ciphertext...)
 
-	return base64.StdEncoding.EncodeToString(ciphertext)
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
 const (
