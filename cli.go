@@ -107,7 +107,7 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 	}
 
 	// Load .env file if exists
-	vars, err := loadDecryptedEnv(file, key)
+	vars, err := loadEnv(file, key)
 	if err != nil {
 		return fmt.Errorf("error loading %s file: %w", file, err)
 	}
@@ -119,7 +119,6 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 
 	for i, v := range vars {
 		// If it isn't already encrypted, encrypt it
-		// Well, we decrypted everything, so just encrypt everything
 		if len(args) == 0 || argMap[v.key] {
 			ciphertext, err := encrypt(v.value, key)
 			if err != nil {
