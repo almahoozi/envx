@@ -24,16 +24,72 @@ func (c *command[T]) execute(ctx context.Context, args ...string) error {
 	return c.fn(ctx, c.val, c.flags.Args()...)
 }
 
+type Format string
+
+const (
+	FormatEnv  Format = "env"
+	FormatJSON Format = "json"
+	FormatYAML Format = "yaml"
+)
+
+type fmtOpts struct {
+	format string
+	json   bool
+	yaml   bool
+	yml    bool
+}
+
+func NewFmtOpts(flags *flag.FlagSet) *fmtOpts {
+	opts := new(fmtOpts)
+	flags.StringVarP(&opts.format, "fmt", "F", "", "Format of the output. Supported formats: env, json, yaml (default \"env\")")
+	// TODO: Consider whether we really want the shorthands
+	flags.BoolVarP(&opts.json, "json", "j", false, "Format the output to JSON")
+	flags.BoolVar(&opts.yaml, "yaml", false, "Format the output to YAML") // TODO: Change to an alias
+	flags.BoolVarP(&opts.yml, "yml", "y", false, "Format the output to YAML")
+	flags.SortFlags = false
+	return opts
+}
+
+func (opts *fmtOpts) Format() (Format, error) {
+	switch Format(opts.format) {
+	case FormatEnv, FormatJSON, FormatYAML:
+		if opts.json || opts.yaml || opts.yml {
+			fmt.Println(opts.json, opts.yaml, opts.yml, opts.format)
+			return "", fmt.Errorf("cannot use both format and json/yaml/yml flags")
+		}
+		return Format(opts.format), nil
+	}
+
+	if opts.json {
+		if opts.yaml || opts.yml {
+			return "", fmt.Errorf("cannot use both json and yaml/yml flags")
+		}
+		return FormatJSON, nil
+	}
+
+	if opts.yaml || opts.yml {
+		if opts.yaml && opts.yml {
+			return "", fmt.Errorf("cannot use both yaml and yml flags")
+		}
+
+		return FormatYAML, nil
+	}
+
+	return FormatEnv, nil
+}
+
 type encryptOpts struct {
-	Name  string
-	File  string
-	Write bool
+	Name    string
+	File    string
+	FmtOpts *fmtOpts
+	Write   bool
 }
 
 type decryptOpts struct {
-	Name  string
-	File  string
-	Write bool
+	Name    string
+	File    string
+	FmtOpts *fmtOpts
+	Write   bool
 }
 
 type runOpts struct {
@@ -59,23 +115,25 @@ func start() error {
 
 	runCmd := new(command[runOpts])
 	runCmd.flags = flag.NewFlagSet("run", flag.ExitOnError)
-	runCmd.flags.StringVarP(&runCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	runCmd.flags.StringVarP(&runCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	runCmd.flags.StringVarP(&runCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	runCmd.fn = run
 	cmds[runCmd.flags.Name()] = runCmd
 
 	encCmd := new(command[encryptOpts])
 	encCmd.flags = flag.NewFlagSet("encrypt", flag.ExitOnError)
-	encCmd.flags.StringVarP(&encCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	encCmd.flags.StringVarP(&encCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	encCmd.flags.StringVarP(&encCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	encCmd.val.FmtOpts = NewFmtOpts(encCmd.flags)
 	encCmd.flags.BoolVarP(&encCmd.val.Write, "write", "w", false, "Overwrites the file with encrypted values.")
 	encCmd.fn = encryptCmd
 	cmds[encCmd.flags.Name()] = encCmd
 
 	decCmd := new(command[decryptOpts])
 	decCmd.flags = flag.NewFlagSet("decrypt", flag.ExitOnError)
-	decCmd.flags.StringVarP(&decCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	decCmd.flags.StringVarP(&decCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	decCmd.flags.StringVarP(&decCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	decCmd.val.FmtOpts = NewFmtOpts(decCmd.flags)
 	decCmd.flags.BoolVarP(&decCmd.val.Write, "write", "w", false, "Overwrites the file with decrypted values.")
 	decCmd.fn = decryptCmd
 	cmds[decCmd.flags.Name()] = decCmd
@@ -96,6 +154,14 @@ func start() error {
 }
 
 func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
+	format, err := opts.FmtOpts.Format()
+	if err != nil {
+		return fmt.Errorf("error parsing format: %w", err)
+	}
+	if format == FormatYAML {
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+
 	file := opts.File
 	if opts.Name != "" {
 		file = fmt.Sprintf("%s.%s", file, opts.Name)
@@ -129,8 +195,21 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 	}
 
 	var sb strings.Builder
+	jsonVars := make([]string, 0, len(vars))
 	for _, v := range vars {
-		sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+		switch format {
+		case FormatJSON:
+			// WARN: Obviously this is not the safest as we don't check for duplicates
+			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
+		default:
+			sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+		}
+	}
+
+	if format == FormatJSON {
+		sb.WriteString("{")
+		sb.WriteString(strings.Join(jsonVars, ","))
+		sb.WriteString("}")
 	}
 
 	output := sb.String()
@@ -146,6 +225,14 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 }
 
 func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
+	format, err := opts.FmtOpts.Format()
+	if err != nil {
+		return fmt.Errorf("error parsing format: %w", err)
+	}
+	if format == FormatYAML {
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+
 	file := opts.File
 	if opts.Name != "" {
 		file = fmt.Sprintf("%s.%s", file, opts.Name)
@@ -178,8 +265,21 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 	}
 
 	var sb strings.Builder
+	jsonVars := make([]string, 0, len(vars))
 	for _, v := range vars {
-		sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+		switch format {
+		case FormatJSON:
+			// WARN: Obviously this is not the safest as we don't check for duplicates
+			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
+		default:
+			sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+		}
+	}
+
+	if format == FormatJSON {
+		sb.WriteString("{")
+		sb.WriteString(strings.Join(jsonVars, ","))
+		sb.WriteString("}")
 	}
 
 	output := sb.String()
