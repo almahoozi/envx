@@ -110,9 +110,16 @@ type setOpts struct {
 }
 
 type getOpts struct {
-	Name    string
-	File    string
-	FmtOpts *fmtOpts
+	Name       string
+	File       string
+	FmtOpts    *fmtOpts
+	ValuesOnly bool
+}
+
+type getVOpts struct {
+	Name      string
+	File      string
+	Separator string
 }
 
 type runOpts struct {
@@ -183,9 +190,18 @@ func start() error {
 	getCmd.flags = flag.NewFlagSet("get", flag.ExitOnError)
 	getCmd.flags.StringVarP(&getCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	getCmd.flags.StringVarP(&getCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	getCmd.flags.BoolVarP(&getCmd.val.ValuesOnly, "vals", "v", false, "Prints only the values without keys. Use getv command instead to set a custom separator. Ignores formatting options.")
 	getCmd.val.FmtOpts = NewFmtOpts(getCmd.flags)
 	getCmd.fn = getCmdFn
 	cmds[getCmd.flags.Name()] = getCmd
+
+	getVCmd := new(command[getVOpts])
+	getVCmd.flags = flag.NewFlagSet("getv", flag.ExitOnError)
+	getVCmd.flags.StringVarP(&getVCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	getVCmd.flags.StringVarP(&getVCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	getVCmd.flags.StringVarP(&getVCmd.val.Separator, "separator", "s", "\n", "Separator for the values (default is new line)")
+	getVCmd.fn = getVCmdFn
+	cmds[getVCmd.flags.Name()] = getVCmd
 
 	cmds[""] = runCmd
 
@@ -202,7 +218,52 @@ func start() error {
 	return fmt.Errorf("missing command")
 }
 
+func getVCmdFn(ctx context.Context, opts getVOpts, args ...string) error {
+	file := opts.File
+	if opts.Name != "" {
+		file = fmt.Sprintf("%s.%s", file, opts.Name)
+	}
+
+	key, err := loadKey()
+	if err != nil {
+		return fmt.Errorf("error loading key: %w", err)
+	}
+
+	vars, err := loadDecryptedEnv(ctx, file, key)
+	if err != nil {
+		return fmt.Errorf("error loading %s file: %w", file, err)
+	}
+
+	varKeys := make(map[string]envVar, len(vars))
+	for _, v := range vars {
+		varKeys[v.key] = v
+	}
+
+	vals := make([]string, 0, len(vars))
+	if len(args) == 0 {
+		for _, v := range vars {
+			vals = append(vals, v.value)
+		}
+		fmt.Println(strings.Join(vals, opts.Separator))
+		return nil
+	}
+
+	for _, arg := range args {
+		if v, exists := varKeys[arg]; exists {
+			vals = append(vals, v.value)
+		} else {
+			return fmt.Errorf("variable %s not found in %s file", arg, file)
+		}
+	}
+	fmt.Println(strings.Join(vals, opts.Separator))
+	return nil
+}
+
 func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
+	if opts.ValuesOnly {
+		return getVCmdFn(ctx, getVOpts{opts.Name, opts.File, "\n"}, args...)
+	}
+
 	format, err := opts.FmtOpts.Format()
 	if err != nil {
 		return fmt.Errorf("error parsing format: %w", err)
