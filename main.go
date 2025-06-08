@@ -195,7 +195,7 @@ func encryptAES(key, plaintext []byte) ([]byte, error) {
 
 func encrypt(value string, key []byte) (string, error) {
 	// If value is already encrypted, don't encrypt it again
-	if strings.HasPrefix(value, "envx") {
+	if decoded, err := base64.StdEncoding.DecodeString(value); err == nil && len(decoded) > 4 && strings.HasPrefix(string(decoded), "envx") {
 		return value, nil
 	}
 
