@@ -374,7 +374,7 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 		case FormatJSON:
 			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
 		default:
-			sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+			sb.WriteString(fmt.Sprintf("%s=%q\n", v.key, v.value))
 		}
 	}
 
@@ -451,7 +451,7 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 		case FormatJSON:
 			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
 		default:
-			sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+			sb.WriteString(fmt.Sprintf("%s=%q\n", v.key, v.value))
 		}
 	}
 
@@ -522,7 +522,7 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 			// WARN: Obviously this is not the safest as we don't check for duplicates
 			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
 		default:
-			sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+			sb.WriteString(fmt.Sprintf("%s=%q\n", v.key, v.value))
 		}
 	}
 
@@ -592,7 +592,7 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 			// WARN: Obviously this is not the safest as we don't check for duplicates
 			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
 		default:
-			sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+			sb.WriteString(fmt.Sprintf("%s=%q\n", v.key, v.value))
 		}
 	}
 
