@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -13,6 +14,8 @@ import (
 	"os"
 	"os/user"
 	"strings"
+
+	"github.com/almahoozi/envx/pkg/errlog"
 )
 
 //go:embed envx.1
@@ -30,7 +33,7 @@ func main() {
 	}
 }
 
-func loadEnv(name string, decryptionKey []byte) (vars []envVar, err error) {
+func loadEnv(ctx context.Context, name string) (vars []envVar, err error) {
 	file, err := os.Open(name)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -39,7 +42,7 @@ func loadEnv(name string, decryptionKey []byte) (vars []envVar, err error) {
 		}
 		return nil, err
 	}
-	defer file.Close()
+	defer errlog.FnLog(ctx, file.Close)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -73,7 +76,7 @@ func loadEnv(name string, decryptionKey []byte) (vars []envVar, err error) {
 	return vars, nil
 }
 
-func loadDecryptedEnv(name string, decryptionKey []byte) (vars []envVar, err error) {
+func loadDecryptedEnv(ctx context.Context, name string, decryptionKey []byte) (vars []envVar, err error) {
 	file, err := os.Open(name)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -82,7 +85,7 @@ func loadDecryptedEnv(name string, decryptionKey []byte) (vars []envVar, err err
 		}
 		return nil, err
 	}
-	defer file.Close()
+	defer errlog.FnLog(ctx, file.Close)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

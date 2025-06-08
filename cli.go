@@ -11,6 +11,9 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+// TODO: Add support for subcommand and option autocomplete, as well as env keys
+// Load from JSON into env :shrug:
+
 type command[T any] struct {
 	flags *flag.FlagSet
 	fn    func(context.Context, T, ...string) error
@@ -92,6 +95,20 @@ type decryptOpts struct {
 	Write   bool
 }
 
+type addOpts struct {
+	Name    string
+	File    string
+	FmtOpts *fmtOpts
+	print   bool
+}
+
+type setOpts struct {
+	Name    string
+	File    string
+	FmtOpts *fmtOpts
+	print   bool
+}
+
 type runOpts struct {
 	Name string
 	File string
@@ -138,6 +155,24 @@ func start() error {
 	decCmd.fn = decryptCmd
 	cmds[decCmd.flags.Name()] = decCmd
 
+	addCmd := new(command[addOpts])
+	addCmd.flags = flag.NewFlagSet("add", flag.ExitOnError)
+	addCmd.flags.StringVarP(&addCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	addCmd.flags.StringVarP(&addCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	addCmd.val.FmtOpts = NewFmtOpts(addCmd.flags)
+	addCmd.flags.BoolVarP(&addCmd.val.print, "print", "p", false, "Prints the output instead of writing to the file.")
+	addCmd.fn = addCmdFn
+	cmds[addCmd.flags.Name()] = addCmd
+
+	setCmd := new(command[setOpts])
+	setCmd.flags = flag.NewFlagSet("set", flag.ExitOnError)
+	setCmd.flags.StringVarP(&setCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	setCmd.flags.StringVarP(&setCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	setCmd.val.FmtOpts = NewFmtOpts(setCmd.flags)
+	setCmd.flags.BoolVarP(&setCmd.val.print, "print", "p", false, "Prints the output instead of writing to the file.")
+	setCmd.fn = setCmdFn
+	cmds[setCmd.flags.Name()] = setCmd
+
 	cmds[""] = runCmd
 
 	if len(os.Args) >= 2 {
@@ -151,6 +186,160 @@ func start() error {
 	}
 
 	return fmt.Errorf("missing command")
+}
+
+func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
+	format, err := opts.FmtOpts.Format()
+	if err != nil {
+		return fmt.Errorf("error parsing format: %w", err)
+	}
+	if format == FormatYAML {
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+
+	file := opts.File
+	if opts.Name != "" {
+		file = fmt.Sprintf("%s.%s", file, opts.Name)
+	}
+
+	key, err := loadKey()
+	if err != nil {
+		return fmt.Errorf("error loading key: %w", err)
+	}
+
+	vars, err := loadEnv(ctx, file)
+	if err != nil {
+		return fmt.Errorf("error loading %s file: %w", file, err)
+	}
+
+	varKeys := make(map[string]int, len(vars))
+	for i, v := range vars {
+		varKeys[v.key] = i
+	}
+
+	for _, arg := range args {
+		if strings.Contains(arg, "=") {
+			parts := strings.SplitN(arg, "=", 2)
+			k := strings.TrimSpace(parts[0])
+			v := strings.TrimSpace(parts[1])
+			ciphertext, err := encrypt(v, key)
+			if err != nil {
+				return fmt.Errorf("error encrypting value: %w", err)
+			}
+			if idx, exists := varKeys[k]; exists {
+				vars[idx].value = ciphertext
+			} else {
+				vars = append(vars, envVar{key: k, value: ciphertext})
+			}
+		} else {
+			return fmt.Errorf("invalid argument format: %s, expected key=value", arg)
+		}
+	}
+
+	var sb strings.Builder
+	jsonVars := make([]string, 0, len(vars))
+	for _, v := range vars {
+		switch format {
+		case FormatJSON:
+			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
+		default:
+			sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+		}
+	}
+
+	if format == FormatJSON {
+		sb.WriteString("{")
+		sb.WriteString(strings.Join(jsonVars, ","))
+		sb.WriteString("}")
+	}
+
+	output := sb.String()
+	if opts.print {
+		fmt.Println(output)
+		return nil
+	}
+
+	if err := os.WriteFile(file, []byte(output), 0o644); err != nil {
+		return fmt.Errorf("error writing %s file: %w", file, err)
+	}
+	return nil
+}
+
+func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
+	format, err := opts.FmtOpts.Format()
+	if err != nil {
+		return fmt.Errorf("error parsing format: %w", err)
+	}
+	if format == FormatYAML {
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+
+	file := opts.File
+	if opts.Name != "" {
+		file = fmt.Sprintf("%s.%s", file, opts.Name)
+	}
+
+	key, err := loadKey()
+	if err != nil {
+		return fmt.Errorf("error loading key: %w", err)
+	}
+
+	vars, err := loadEnv(ctx, file)
+	if err != nil {
+		return fmt.Errorf("error loading %s file: %w", file, err)
+	}
+
+	varKeys := make(map[string]bool, len(vars))
+	for _, v := range vars {
+		varKeys[v.key] = true
+	}
+
+	for _, arg := range args {
+		if strings.Contains(arg, "=") {
+			parts := strings.SplitN(arg, "=", 2)
+			k := strings.TrimSpace(parts[0])
+			if varKeys[k] {
+				return fmt.Errorf("variable %s already exists in %s file", k, file)
+			}
+
+			v := strings.TrimSpace(parts[1])
+			ciphertext, err := encrypt(v, key)
+			if err != nil {
+				return fmt.Errorf("error encrypting value: %w", err)
+			}
+			vars = append(vars, envVar{key: k, value: ciphertext})
+		} else {
+			return fmt.Errorf("invalid argument format: %s, expected key=value", arg)
+		}
+	}
+
+	var sb strings.Builder
+	jsonVars := make([]string, 0, len(vars))
+	for _, v := range vars {
+		switch format {
+		case FormatJSON:
+			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
+		default:
+			sb.WriteString(fmt.Sprintf("%s=%s\n", v.key, v.value))
+		}
+	}
+
+	if format == FormatJSON {
+		sb.WriteString("{")
+		sb.WriteString(strings.Join(jsonVars, ","))
+		sb.WriteString("}")
+	}
+
+	output := sb.String()
+	if opts.print {
+		fmt.Println(output)
+		return nil
+	}
+
+	if err := os.WriteFile(file, []byte(output), 0o644); err != nil {
+		return fmt.Errorf("error writing %s file: %w", file, err)
+	}
+	return nil
 }
 
 func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
@@ -173,7 +362,7 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 	}
 
 	// Load .env file if exists
-	vars, err := loadEnv(file, key)
+	vars, err := loadEnv(ctx, file)
 	if err != nil {
 		return fmt.Errorf("error loading %s file: %w", file, err)
 	}
@@ -244,7 +433,7 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 	}
 
 	// Load .env file if exists
-	vars, err := loadEnv(file, key)
+	vars, err := loadEnv(ctx, file)
 	if err != nil {
 		return fmt.Errorf("error loading %s file: %w", file, err)
 	}
@@ -312,7 +501,7 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 		return fmt.Errorf("error loading key: %w", err)
 	}
 
-	vars, err := loadDecryptedEnv(file, key)
+	vars, err := loadDecryptedEnv(ctx, file, key)
 	if err != nil {
 		return fmt.Errorf("error loading env file: %w", err)
 	}
