@@ -109,6 +109,12 @@ type setOpts struct {
 	print   bool
 }
 
+type getOpts struct {
+	Name    string
+	File    string
+	FmtOpts *fmtOpts
+}
+
 type runOpts struct {
 	Name string
 	File string
@@ -173,6 +179,14 @@ func start() error {
 	setCmd.fn = setCmdFn
 	cmds[setCmd.flags.Name()] = setCmd
 
+	getCmd := new(command[getOpts])
+	getCmd.flags = flag.NewFlagSet("get", flag.ExitOnError)
+	getCmd.flags.StringVarP(&getCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	getCmd.flags.StringVarP(&getCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	getCmd.val.FmtOpts = NewFmtOpts(getCmd.flags)
+	getCmd.fn = getCmdFn
+	cmds[getCmd.flags.Name()] = getCmd
+
 	cmds[""] = runCmd
 
 	if len(os.Args) >= 2 {
@@ -186,6 +200,62 @@ func start() error {
 	}
 
 	return fmt.Errorf("missing command")
+}
+
+func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
+	format, err := opts.FmtOpts.Format()
+	if err != nil {
+		return fmt.Errorf("error parsing format: %w", err)
+	}
+	if format == FormatYAML {
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+
+	file := opts.File
+	if opts.Name != "" {
+		file = fmt.Sprintf("%s.%s", file, opts.Name)
+	}
+
+	key, err := loadKey()
+	if err != nil {
+		return fmt.Errorf("error loading key: %w", err)
+	}
+
+	vars, err := loadDecryptedEnv(ctx, file, key)
+	if err != nil {
+		return fmt.Errorf("error loading %s file: %w", file, err)
+	}
+
+	varKeys := make(map[string]envVar, len(vars))
+	for _, v := range vars {
+		varKeys[v.key] = v
+	}
+
+	if len(args) == 0 {
+		for _, v := range vars {
+			switch format {
+			case FormatJSON:
+				fmt.Printf("%q:%q\n", v.key, v.value)
+			default:
+				fmt.Printf("%s=%s\n", v.key, v.value)
+			}
+		}
+		return nil
+	}
+
+	for _, arg := range args {
+		if v, exists := varKeys[arg]; exists {
+			switch format {
+			case FormatJSON:
+				fmt.Printf("%q:%q\n", v.key, v.value)
+			default:
+				fmt.Printf("%s=%s\n", v.key, v.value)
+			}
+		} else {
+			return fmt.Errorf("variable %s not found in %s file", arg, file)
+		}
+	}
+	return nil
 }
 
 func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
