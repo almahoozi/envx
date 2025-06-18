@@ -11,6 +11,7 @@ import (
 	"github.com/almahoozi/envx/pkg/crypto"
 	"github.com/almahoozi/envx/pkg/env"
 	flag "github.com/spf13/pflag"
+	"golang.org/x/term"
 )
 
 // TODO: Add support for subcommand and option autocomplete, as well as env keys
@@ -333,21 +334,20 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 		return fmt.Errorf("error loading %s file: %w", file, err)
 	}
 
+	// Parse arguments supporting both key=value and key-only formats
+	keyValues, err := parseKeyValueArgs(args)
+	if err != nil {
+		return fmt.Errorf("error parsing arguments: %w", err)
+	}
+
 	encryptor := crypto.NewAESEncryptor()
 
-	for _, arg := range args {
-		if strings.Contains(arg, "=") {
-			parts := strings.SplitN(arg, "=", 2)
-			k := strings.TrimSpace(parts[0])
-			v := strings.TrimSpace(parts[1])
-			ciphertext, err := encryptor.Encrypt(v, key)
-			if err != nil {
-				return fmt.Errorf("error encrypting value: %w", err)
-			}
-			vars.Set(k, ciphertext)
-		} else {
-			return fmt.Errorf("invalid argument format: %s, expected key=value", arg)
+	for k, v := range keyValues {
+		ciphertext, err := encryptor.Encrypt(v, key)
+		if err != nil {
+			return fmt.Errorf("error encrypting value for key %s: %w", k, err)
 		}
+		vars.Set(k, ciphertext)
 	}
 
 	if opts.print {
@@ -396,25 +396,28 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 	}
 
 	varMap := vars.ToMap()
+
+	// Parse arguments supporting both key=value and key-only formats
+	keyValues, err := parseKeyValueArgs(args)
+	if err != nil {
+		return fmt.Errorf("error parsing arguments: %w", err)
+	}
+
+	// Check for existing keys first
+	for k := range keyValues {
+		if _, exists := varMap[k]; exists {
+			return fmt.Errorf("variable %s already exists in %s file", k, file)
+		}
+	}
+
 	encryptor := crypto.NewAESEncryptor()
 
-	for _, arg := range args {
-		if strings.Contains(arg, "=") {
-			parts := strings.SplitN(arg, "=", 2)
-			k := strings.TrimSpace(parts[0])
-			if _, exists := varMap[k]; exists {
-				return fmt.Errorf("variable %s already exists in %s file", k, file)
-			}
-
-			v := strings.TrimSpace(parts[1])
-			ciphertext, err := encryptor.Encrypt(v, key)
-			if err != nil {
-				return fmt.Errorf("error encrypting value: %w", err)
-			}
-			vars.Set(k, ciphertext)
-		} else {
-			return fmt.Errorf("invalid argument format: %s, expected key=value", arg)
+	for k, v := range keyValues {
+		ciphertext, err := encryptor.Encrypt(v, key)
+		if err != nil {
+			return fmt.Errorf("error encrypting value for key %s: %w", k, err)
 		}
+		vars.Set(k, ciphertext)
 	}
 
 	if opts.print {
@@ -618,4 +621,51 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 		os.Exit(1)
 	}
 	return nil
+}
+
+// promptForSecretValue prompts the user to enter a secret value securely
+func promptForSecretValue(key string) (string, error) {
+	fmt.Printf("Enter value for %s: ", key)
+
+	// Read password without echoing to terminal
+	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return "", fmt.Errorf("failed to read password: %w", err)
+	}
+
+	fmt.Println() // Print newline after password input
+	return string(bytePassword), nil
+}
+
+// parseKeyValueArgs parses arguments that can be either "key=value" or just "key"
+// For keys without values, it prompts securely for the value
+func parseKeyValueArgs(args []string) (map[string]string, error) {
+	result := make(map[string]string)
+
+	for _, arg := range args {
+		if strings.Contains(arg, "=") {
+			// Handle key=value format
+			parts := strings.SplitN(arg, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			if key == "" {
+				return nil, fmt.Errorf("empty key in argument: %s", arg)
+			}
+			result[key] = value
+		} else {
+			// Handle key-only format - prompt for value
+			key := strings.TrimSpace(arg)
+			if key == "" {
+				return nil, fmt.Errorf("empty key: %s", arg)
+			}
+
+			value, err := promptForSecretValue(key)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get value for key %s: %w", key, err)
+			}
+			result[key] = value
+		}
+	}
+
+	return result, nil
 }

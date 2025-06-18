@@ -338,15 +338,15 @@ KEY2=value2`
 			wantErr: false,
 		},
 		{
-			name: "invalid argument format",
+			name: "key only format - would prompt for input",
 			opts: setOpts{
 				File:    envFile,
 				Name:    "",
 				FmtOpts: &fmtOpts{},
 				print:   true,
 			},
-			args:    []string{"INVALID_NO_EQUALS"},
-			wantErr: true,
+			args:    []string{"KEY_ONLY"},
+			wantErr: true, // Will fail in test because it tries to read from stdin
 		},
 		{
 			name: "yaml format - unsupported",
@@ -430,15 +430,15 @@ KEY2=value2`
 			wantErr: true,
 		},
 		{
-			name: "invalid argument format",
+			name: "key only format - would prompt for input",
 			opts: addOpts{
 				File:    envFile,
 				Name:    "",
 				FmtOpts: &fmtOpts{},
 				print:   true,
 			},
-			args:    []string{"INVALID_NO_EQUALS"},
-			wantErr: true,
+			args:    []string{"KEY_ONLY"},
+			wantErr: true, // Will fail in test because it tries to read from stdin
 		},
 	}
 
@@ -701,4 +701,79 @@ func TestCommandExecutionFlow(t *testing.T) {
 			t.Fatalf("getCmdFn() failed: %v", err)
 		}
 	})
+}
+
+func TestParseKeyValueArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected map[string]string
+		wantErr  bool
+	}{
+		{
+			name:     "key=value format",
+			args:     []string{"KEY1=value1", "KEY2=value2"},
+			expected: map[string]string{"KEY1": "value1", "KEY2": "value2"},
+			wantErr:  false,
+		},
+		{
+			name:     "empty key with equals",
+			args:     []string{"=value"},
+			expected: nil,
+			wantErr:  true,
+		},
+		{
+			name:     "empty key",
+			args:     []string{""},
+			expected: nil,
+			wantErr:  true,
+		},
+		{
+			name:     "key with spaces",
+			args:     []string{"  KEY1  =  value1  "},
+			expected: map[string]string{"KEY1": "value1"},
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// For tests that don't involve prompting (key=value format)
+			if tt.wantErr || containsEquals(tt.args) {
+				result, err := parseKeyValueArgs(tt.args)
+
+				if tt.wantErr {
+					if err == nil {
+						t.Errorf("parseKeyValueArgs() expected error but got none")
+					}
+					return
+				}
+
+				if err != nil {
+					t.Errorf("parseKeyValueArgs() unexpected error: %v", err)
+					return
+				}
+
+				if len(result) != len(tt.expected) {
+					t.Errorf("parseKeyValueArgs() got %d keys, want %d", len(result), len(tt.expected))
+					return
+				}
+
+				for k, v := range tt.expected {
+					if result[k] != v {
+						t.Errorf("parseKeyValueArgs() key %s = %q, want %q", k, result[k], v)
+					}
+				}
+			}
+		})
+	}
+}
+
+func containsEquals(args []string) bool {
+	for _, arg := range args {
+		if !strings.Contains(arg, "=") {
+			return false
+		}
+	}
+	return true
 }

@@ -1,5 +1,7 @@
 bin
 example
+envx
 .env
 .env.local
+.env.test
 .DS_Store

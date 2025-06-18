@@ -62,18 +62,24 @@ Decrypts encrypted variables in the `.env` file. By default prints to stdout; us
 ### `add` - Add New Encrypted Variables
 ```bash
 envx add KEY1=value1 KEY2=value2    # add new variables (fails if exists)
+envx add KEY1 KEY2                  # prompt securely for values (recommended for secrets)
 envx add KEY=value -p               # print result instead of writing
 envx add KEY=value --json           # output in JSON format
 ```
 Encrypts and adds new variables to the `.env` file. Fails if the variable already exists (use `set` to overwrite).
 
+**Secure Input**: You can specify just the key names (without `=value`) and envx will prompt you to enter the values securely without echoing to the terminal or storing them in shell history. This is the recommended approach for sensitive values like passwords and API keys.
+
 ### `set` - Set/Update Encrypted Variables
 ```bash
 envx set KEY1=value1 KEY2=value2    # set variables (overwrites if exists)
+envx set KEY1 KEY2                  # prompt securely for values (recommended for secrets)
 envx set KEY=value -p               # print result instead of writing
 envx set KEY=value --json           # output in JSON format
 ```
 Encrypts and sets variables in the `.env` file. Overwrites existing values (use `add` to prevent overwriting).
+
+**Secure Input**: Like `add`, you can specify just key names and envx will prompt securely for values without exposing them in terminal history.
 
 ### `get` - Retrieve Decrypted Variables
 ```bash
@@ -120,8 +126,16 @@ Commands that modify files support:
 - `-w` or `--write`: Write changes to the file instead of printing to stdout
 - `-p` or `--print`: Print output instead of writing to file (for `add`/`set` commands)
 
-## Key Management
+## Security Features
 
+### Secure Value Input
+For maximum security when adding or updating secrets:
+- **Use key-only format**: `envx add SECRET_KEY` instead of `envx add SECRET_KEY=value`
+- envx will prompt you to enter the value securely without echoing to the terminal
+- Values won't appear in your shell history or process list
+- Recommended for passwords, API keys, tokens, and other sensitive data
+
+### Key Management
 envx automatically manages encryption keys using the macOS Keychain:
 - Keys are generated automatically on first use
 - Keys are stored securely in the system keychain
@@ -133,10 +147,16 @@ envx automatically manages encryption keys using the macOS Keychain:
 # Run a program with decrypted environment
 envx run npm start
 
-# Add a new secret (encrypted)
+# Add secrets securely (prompts for values without exposing them)
+envx add DATABASE_PASSWORD API_KEY
+
+# Add a new secret with value on command line (less secure)
 envx add DATABASE_PASSWORD=secret123
 
-# Update an existing value
+# Update existing secrets securely
+envx set API_KEY JWT_SECRET
+
+# Update an existing value with command line (less secure)
 envx set API_KEY=new-api-key-value
 
 # View all decrypted values
@@ -150,5 +170,5 @@ envx encrypt -w
 
 # Work with different env files
 envx -f .env.production get
-envx -n staging add NEW_VAR=value
+envx -n staging add NEW_VAR
 ```
