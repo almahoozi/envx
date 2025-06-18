@@ -342,19 +342,21 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 
 	encryptor := crypto.NewAESEncryptor()
 
-	for k, v := range keyValues {
-		ciphertext, err := encryptor.Encrypt(v, key)
-		if err != nil {
-			return fmt.Errorf("error encrypting value for key %s: %w", k, err)
-		}
-		vars.Set(k, ciphertext)
-	}
-
 	if opts.print {
+		// Create a new Variables slice with only the newly set values
+		newVars := make(env.Variables, 0, len(keyValues))
+		for k, v := range keyValues {
+			ciphertext, err := encryptor.Encrypt(v, key)
+			if err != nil {
+				return fmt.Errorf("error encrypting value for key %s: %w", k, err)
+			}
+			newVars = append(newVars, env.Variable{Key: k, Value: ciphertext})
+		}
+
 		writer := env.NewFileWriter()
 		// Use a temp file to get the output
 		tempFile := "/tmp/envx_temp_output"
-		err := writer.Write(tempFile, vars, format)
+		err := writer.Write(tempFile, newVars, format)
 		if err != nil {
 			return fmt.Errorf("error formatting output: %w", err)
 		}
@@ -365,6 +367,15 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 		os.Remove(tempFile)
 		fmt.Print(string(content))
 		return nil
+	}
+
+	// If not printing, update the actual vars and write to file
+	for k, v := range keyValues {
+		ciphertext, err := encryptor.Encrypt(v, key)
+		if err != nil {
+			return fmt.Errorf("error encrypting value for key %s: %w", k, err)
+		}
+		vars.Set(k, ciphertext)
 	}
 
 	writer := env.NewFileWriter()
@@ -412,19 +423,21 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 
 	encryptor := crypto.NewAESEncryptor()
 
-	for k, v := range keyValues {
-		ciphertext, err := encryptor.Encrypt(v, key)
-		if err != nil {
-			return fmt.Errorf("error encrypting value for key %s: %w", k, err)
-		}
-		vars.Set(k, ciphertext)
-	}
-
 	if opts.print {
+		// Create a new Variables slice with only the newly added values
+		newVars := make(env.Variables, 0, len(keyValues))
+		for k, v := range keyValues {
+			ciphertext, err := encryptor.Encrypt(v, key)
+			if err != nil {
+				return fmt.Errorf("error encrypting value for key %s: %w", k, err)
+			}
+			newVars = append(newVars, env.Variable{Key: k, Value: ciphertext})
+		}
+
 		writer := env.NewFileWriter()
 		// Use a temp file to get the output
 		tempFile := "/tmp/envx_temp_output"
-		err := writer.Write(tempFile, vars, format)
+		err := writer.Write(tempFile, newVars, format)
 		if err != nil {
 			return fmt.Errorf("error formatting output: %w", err)
 		}
@@ -435,6 +448,15 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 		os.Remove(tempFile)
 		fmt.Print(string(content))
 		return nil
+	}
+
+	// If not printing, update the actual vars and write to file
+	for k, v := range keyValues {
+		ciphertext, err := encryptor.Encrypt(v, key)
+		if err != nil {
+			return fmt.Errorf("error encrypting value for key %s: %w", k, err)
+		}
+		vars.Set(k, ciphertext)
 	}
 
 	writer := env.NewFileWriter()
