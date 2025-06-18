@@ -95,4 +95,4 @@ func (k *macOSKeyStore) LoadOrCreateKey(account string) ([]byte, error) {
 	}
 
 	return key, nil
-} 
+}

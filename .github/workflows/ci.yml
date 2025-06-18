@@ -116,10 +116,11 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
+    - name: Install gosec
+      run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
     - name: Run Gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: '-fmt sarif -out gosec.sarif ./...'
+      run: gosec -fmt sarif -out gosec.sarif ./...
 
     # OPTIONAL: Remove this step if you don't want security results in GitHub Security tab
     # This uploads security scan results to GitHub's Security tab (stays within GitHub)

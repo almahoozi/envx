@@ -1,3 +1,5 @@
+//go:build darwin
+
 package keystore
 
 /*
@@ -120,4 +122,4 @@ func getGenericPassword(service, account string) (username string, password []by
 	username = C.GoString((*C.char)(unsafe.Pointer(&accountCStr[0])))
 
 	return
-} 
+}
