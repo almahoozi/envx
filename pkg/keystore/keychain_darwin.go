@@ -1,4 +1,4 @@
-package main
+package keystore
 
 /*
 #cgo LDFLAGS: -framework Security -framework CoreFoundation
@@ -13,9 +13,7 @@ import (
 	"unsafe"
 )
 
-// IMPLEMENT: Use keys instead of passwords, and try to let the encryption happen
-// using the Secure Enclave.
-
+// setGenericPassword stores a password in the macOS Keychain
 func setGenericPassword(label, service, account string, password []byte) error {
 	allocator := C.kCFAllocatorDefault
 	query := C.CFDictionaryCreateMutable(allocator, 0, nil, nil)
@@ -66,6 +64,7 @@ func setGenericPassword(label, service, account string, password []byte) error {
 	return nil
 }
 
+// getGenericPassword retrieves a password from the macOS Keychain
 func getGenericPassword(service, account string) (username string, password []byte, err error) {
 	allocator := C.kCFAllocatorDefault
 	query := C.CFDictionaryCreateMutable(allocator, 0, nil, nil)
@@ -121,4 +120,4 @@ func getGenericPassword(service, account string) (username string, password []by
 	username = C.GoString((*C.char)(unsafe.Pointer(&accountCStr[0])))
 
 	return
-}
+} 
