@@ -164,8 +164,13 @@ envx automatically manages encryption keys using the macOS Keychain:
 ## Examples
 
 ```bash
-# Run a program with decrypted environment
-envx run npm start
+# Run Go programs with decrypted environment
+envx run go run main.go
+envx run ./my-server
+
+# Run other programs with decrypted environment  
+envx run ./scripts/deploy.sh
+envx run docker-compose up
 
 # Add secrets securely (prompts for values without exposing them)
 envx add DATABASE_PASSWORD API_KEY
