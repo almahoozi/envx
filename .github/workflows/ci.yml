@@ -70,18 +70,42 @@ jobs:
           echo "- **Overall Coverage:** $COVERAGE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Get per-package coverage
+          # Get per-package coverage (aggregate by package)
           echo "### Per-Package Coverage" >> $GITHUB_STEP_SUMMARY
           echo "| Package | Coverage |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|----------|" >> $GITHUB_STEP_SUMMARY
           
-          go tool cover -func=coverage.out | grep -v "total:" | while read line; do
-            if [[ $line =~ ^(.+):.*[[:space:]]([0-9.]+%) ]]; then
-              package=$(echo "${BASH_REMATCH[1]}" | sed 's/.*\///' | sed 's/\.go.*//')
-              coverage="${BASH_REMATCH[2]}"
-              echo "| $package | $coverage |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
+          # Create a temporary file to aggregate coverage by package
+          go tool cover -func=coverage.out | grep -v "total:" | awk '{
+            # Extract package path from filename (everything before the last /)
+            split($1, parts, "/")
+            if (length(parts) > 1) {
+              # For files like github.com/user/repo/pkg/module/file.go, get pkg/module
+              package = ""
+              for (i = length(parts) - 1; i >= 1; i--) {
+                if (parts[i] ~ /^(pkg|cmd|internal)$/ || (i == length(parts) - 1 && parts[i] != "main.go")) {
+                  if (package == "") package = parts[i]
+                  else package = parts[i] "/" package
+                  break
+                }
+              }
+              if (package == "") package = parts[length(parts)-1]
+            } else {
+              package = "main"
+            }
+            
+            # Extract coverage percentage
+            coverage = $NF
+            gsub(/%/, "", coverage)
+            
+            # Store coverage for this package
+            packages[package] = coverage
+          }
+          END {
+            for (pkg in packages) {
+              printf "| %s | %.1f%% |\n", pkg, packages[pkg]
+            }
+          }' >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ **No coverage data available**" >> $GITHUB_STEP_SUMMARY
         fi
@@ -100,16 +124,19 @@ jobs:
           echo "✅ **Benchmarks completed successfully**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Key Performance Metrics" >> $GITHUB_STEP_SUMMARY
-          echo "| Benchmark | Operations | ns/op | MB/s | allocs/op |" >> $GITHUB_STEP_SUMMARY
+          echo "| Benchmark | Operations | ns/op | B/op | allocs/op |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|------------|-------|------|-----------|" >> $GITHUB_STEP_SUMMARY
           
-          # Parse benchmark results
+          # Parse benchmark results with memory stats
           grep "^Benchmark" bench-results.txt | head -10 | while read line; do
-            if [[ $line =~ ^(Benchmark[^[:space:]]+)[[:space:]]+([0-9]+)[[:space:]]+([0-9.]+)[[:space:]]+ns/op ]]; then
-              name=$(echo "${BASH_REMATCH[1]}" | sed 's/Benchmark//')
+            # Parse benchmark line: BenchmarkName-N  ops  ns/op  B/op  allocs/op
+            if [[ $line =~ ^(Benchmark[^[:space:]]+)[[:space:]]+([0-9]+)[[:space:]]+([0-9.]+)[[:space:]]+ns/op([[:space:]]+([0-9.]+)[[:space:]]+B/op)?([[:space:]]+([0-9]+)[[:space:]]+allocs/op)? ]]; then
+              name=$(echo "${BASH_REMATCH[1]}" | sed 's/Benchmark//' | sed 's/-[0-9]*$//')
               ops="${BASH_REMATCH[2]}"
               nsop="${BASH_REMATCH[3]}"
-              echo "| $name | $ops | $nsop | - | - |" >> $GITHUB_STEP_SUMMARY
+              bop="${BASH_REMATCH[5]:-N/A}"
+              allocs="${BASH_REMATCH[7]:-N/A}"
+              echo "| $name | $ops | $nsop | $bop | $allocs |" >> $GITHUB_STEP_SUMMARY
             fi
           done
         else

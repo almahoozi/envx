@@ -5,8 +5,8 @@
 [![License](https://img.shields.io/github/license/almahoozi/envx)](https://github.com/almahoozi/envx/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/almahoozi/envx)](https://github.com/almahoozi/envx/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/almahoozi/envx)](https://goreportcard.com/report/github.com/almahoozi/envx)
-[![Security](https://img.shields.io/badge/security-gosec-brightgreen)](https://github.com/securego/gosec)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue)](#)
+[![Security](https://img.shields.io/badge/security-passing-brightgreen)](https://github.com/almahoozi/envx/actions/workflows/ci.yml)
+[![Platform](https://img.shields.io/badge/platform-macOS%20(production)%20%7C%20Linux/Windows%20(testing)-blue)](#platform-support)
 
 ```bash
 go install github.com/almahoozi/envx@latest
@@ -133,6 +133,18 @@ Commands that modify files support:
 
 - `-w` or `--write`: Write changes to the file instead of printing to stdout
 - `-p` or `--print`: Print output instead of writing to file (for `add`/`set` commands)
+
+## Platform Support
+
+### Production Support
+- **macOS**: Full production support with secure keychain integration
+- All encryption keys are stored in the macOS Keychain for maximum security
+
+### Testing/Development Support  
+- **Linux/Windows**: Functional for testing and development
+- Uses in-memory mock keystore (keys are not persisted between sessions)
+- Suitable for CI/CD pipelines and development environments
+- Not recommended for production use due to non-persistent key storage
 
 ## Security Features
 

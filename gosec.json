@@ -1,0 +1,124 @@
+{
+	"Golang errors": {},
+	"Issues": [
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int64 -\u003e int32",
+			"file": "/Users/hussam/Library/Caches/go-build/36/361b653fed2432a21d07d5692653daf6de6d0332a0d5a95f533c25ce00a30df4-d",
+			"code": "",
+			"line": "117",
+			"column": "53",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int -\u003e uint64",
+			"file": "/Users/hussam/Library/Caches/go-build/2b/2b9aaa10b6e523de4b9c9b0fe975c0048e6567cab771355d2759f7eff712f5da-d",
+			"code": "315: \t}\n316: \tp := _cgo_cmalloc(uint64(len(s)+1))\n317: \tsliceHeader := struct {\n",
+			"line": "316",
+			"column": "26",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "22",
+				"url": "https://cwe.mitre.org/data/definitions/22.html"
+			},
+			"rule_id": "G304",
+			"details": "Potential file inclusion via variable",
+			"file": "/Users/hussam/Documents/Source/personal/envx/cli.go",
+			"code": "591: \t\t}\n592: \t\tcontent, err := os.ReadFile(tempFile)\n593: \t\tif err != nil {\n",
+			"line": "592",
+			"column": "19",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "22",
+				"url": "https://cwe.mitre.org/data/definitions/22.html"
+			},
+			"rule_id": "G304",
+			"details": "Potential file inclusion via variable",
+			"file": "/Users/hussam/Documents/Source/personal/envx/cli.go",
+			"code": "525: \t\t}\n526: \t\tcontent, err := os.ReadFile(tempFile)\n527: \t\tif err != nil {\n",
+			"line": "526",
+			"column": "19",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "22",
+				"url": "https://cwe.mitre.org/data/definitions/22.html"
+			},
+			"rule_id": "G304",
+			"details": "Potential file inclusion via variable",
+			"file": "/Users/hussam/Documents/Source/personal/envx/cli.go",
+			"code": "449: \t\t}\n450: \t\tcontent, err := os.ReadFile(tempFile)\n451: \t\tif err != nil {\n",
+			"line": "450",
+			"column": "19",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "22",
+				"url": "https://cwe.mitre.org/data/definitions/22.html"
+			},
+			"rule_id": "G304",
+			"details": "Potential file inclusion via variable",
+			"file": "/Users/hussam/Documents/Source/personal/envx/cli.go",
+			"code": "365: \t\t}\n366: \t\tcontent, err := os.ReadFile(tempFile)\n367: \t\tif err != nil {\n",
+			"line": "366",
+			"column": "19",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/hussam/Documents/Source/personal/envx/cli.go",
+			"code": "671: \ttempFileName := tempFile.Name()\n672: \ttempFile.Close()\n673: \treturn tempFileName, nil\n",
+			"line": "672",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		}
+	],
+	"Stats": {
+		"files": 8,
+		"lines": 1423,
+		"nosec": 2,
+		"found": 7
+	},
+	"GosecVersion": "dev"
+}
