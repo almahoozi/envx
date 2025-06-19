@@ -314,6 +314,7 @@ jobs:
 
     - name: Generate build summary
       if: always()
+      shell: bash
       run: |
         echo "## 🏗️ Build Results (${{ matrix.os }})" >> $GITHUB_STEP_SUMMARY
         

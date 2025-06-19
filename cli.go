@@ -355,8 +355,11 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 
 		writer := env.NewFileWriter()
 		// Use a temp file to get the output
-		tempFile := "/tmp/envx_temp_output"
-		err := writer.Write(tempFile, newVars, format)
+		tempFile, err := createTempFile()
+		if err != nil {
+			return err
+		}
+		err = writer.Write(tempFile, newVars, format)
 		if err != nil {
 			return fmt.Errorf("error formatting output: %w", err)
 		}
@@ -436,8 +439,11 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 
 		writer := env.NewFileWriter()
 		// Use a temp file to get the output
-		tempFile := "/tmp/envx_temp_output"
-		err := writer.Write(tempFile, newVars, format)
+		tempFile, err := createTempFile()
+		if err != nil {
+			return err
+		}
+		err = writer.Write(tempFile, newVars, format)
 		if err != nil {
 			return fmt.Errorf("error formatting output: %w", err)
 		}
@@ -509,8 +515,11 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 	if !opts.Write {
 		writer := env.NewFileWriter()
 		// Use a temp file to get the output
-		tempFile := "/tmp/envx_temp_output"
-		err := writer.Write(tempFile, vars, format)
+		tempFile, err := createTempFile()
+		if err != nil {
+			return err
+		}
+		err = writer.Write(tempFile, vars, format)
 		if err != nil {
 			return fmt.Errorf("error formatting output: %w", err)
 		}
@@ -572,8 +581,11 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 	if !opts.Write {
 		writer := env.NewFileWriter()
 		// Use a temp file to get the output
-		tempFile := "/tmp/envx_temp_output"
-		err := writer.Write(tempFile, vars, format)
+		tempFile, err := createTempFile()
+		if err != nil {
+			return err
+		}
+		err = writer.Write(tempFile, vars, format)
 		if err != nil {
 			return fmt.Errorf("error formatting output: %w", err)
 		}
@@ -648,6 +660,17 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 // removeFileIgnoreError removes a file and ignores any error (for temp file cleanup)
 func removeFileIgnoreError(filename string) {
 	_ = os.Remove(filename) // Ignore error for temp file cleanup
+}
+
+// createTempFile creates a temporary file and returns its name
+func createTempFile() (string, error) {
+	tempFile, err := os.CreateTemp("", "envx_temp_output_*")
+	if err != nil {
+		return "", fmt.Errorf("error creating temp file: %w", err)
+	}
+	tempFileName := tempFile.Name()
+	tempFile.Close()
+	return tempFileName, nil
 }
 
 // promptForSecretValue prompts the user to enter a secret value securely
