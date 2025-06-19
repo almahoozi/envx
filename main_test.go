@@ -84,6 +84,10 @@ func TestLoadDecryptedEnv(t *testing.T) {
 }
 
 func TestLoadKey(t *testing.T) {
+	// Setup test keystore to avoid interfering with production keychain
+	setupTestKeystore(t)
+	defer teardownTestKeystore(t)
+
 	// Get current user
 	currentUser, err := user.Current()
 	if err != nil {
