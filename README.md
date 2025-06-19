@@ -1,11 +1,11 @@
 # envx - Execute with (encrypted) Environment Variables
 
 [![CI](https://github.com/almahoozi/envx/actions/workflows/ci.yml/badge.svg)](https://github.com/almahoozi/envx/actions/workflows/ci.yml)
+[![Security](https://img.shields.io/github/actions/workflow/status/almahoozi/envx/ci.yml?branch=main&label=security%20scan&logo=shield)](https://github.com/almahoozi/envx/security)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/almahoozi/envx)](https://github.com/almahoozi/envx/blob/main/go.mod)
 [![License](https://img.shields.io/github/license/almahoozi/envx)](https://github.com/almahoozi/envx/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/almahoozi/envx)](https://github.com/almahoozi/envx/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/almahoozi/envx)](https://goreportcard.com/report/github.com/almahoozi/envx)
-[![Security](https://img.shields.io/badge/security-passing-brightgreen)](https://github.com/almahoozi/envx/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-macOS%20(production)%20%7C%20Linux/Windows%20(testing)-blue)](#platform-support)
 
 ```bash

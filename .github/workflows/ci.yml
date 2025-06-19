@@ -262,7 +262,7 @@ jobs:
       # Real security issues will still be reported in SARIF output for review
       run: gosec -no-fail -fmt sarif -out gosec.sarif ./...
 
-    - name: Generate security summary
+    - name: Generate security summary and badge data
       if: always()
       run: |
         echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
@@ -283,17 +283,23 @@ jobs:
             echo "- **Security Issues:** $ISSUES_COUNT" >> $GITHUB_STEP_SUMMARY
             echo "- **Suppressed (nosec):** $NOSEC_COUNT" >> $GITHUB_STEP_SUMMARY
             
+
+            
             if [ "$ISSUES_COUNT" -gt 0 ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "⚠️ **Note:** Issues found may include false positives from CGO dependencies" >> $GITHUB_STEP_SUMMARY
             fi
           else
             echo "- **Status:** Scan completed successfully" >> $GITHUB_STEP_SUMMARY
+
           fi
         else
           echo "❌ **Security scan encountered issues**" >> $GITHUB_STEP_SUMMARY
+
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
+
+
 
     # OPTIONAL: Remove this step if you don't want security results in GitHub Security tab
     # This uploads security scan results to GitHub's Security tab (stays within GitHub)

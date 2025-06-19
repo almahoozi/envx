@@ -5,3 +5,7 @@ envx
 .env.local
 .env.test
 .DS_Store
+
+# Security scan outputs
+gosec.json
+gosec.sarif
