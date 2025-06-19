@@ -364,7 +364,7 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 		if err != nil {
 			return fmt.Errorf("error reading formatted output: %w", err)
 		}
-		os.Remove(tempFile)
+		removeFileIgnoreError(tempFile)
 		fmt.Print(string(content))
 		return nil
 	}
@@ -445,7 +445,7 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 		if err != nil {
 			return fmt.Errorf("error reading formatted output: %w", err)
 		}
-		os.Remove(tempFile)
+		removeFileIgnoreError(tempFile)
 		fmt.Print(string(content))
 		return nil
 	}
@@ -518,7 +518,7 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 		if err != nil {
 			return fmt.Errorf("error reading formatted output: %w", err)
 		}
-		os.Remove(tempFile)
+		removeFileIgnoreError(tempFile)
 		fmt.Print(string(content))
 		return nil
 	}
@@ -581,7 +581,7 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 		if err != nil {
 			return fmt.Errorf("error reading formatted output: %w", err)
 		}
-		os.Remove(tempFile)
+		removeFileIgnoreError(tempFile)
 		fmt.Print(string(content))
 		return nil
 	}
@@ -637,12 +637,17 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 	  }
 	*/
 
-	err = syscall.Exec(exe, args, os.Environ())
+	err = syscall.Exec(exe, args, os.Environ()) // #nosec G204 -- Intentional subprocess execution with validated executable path
 	if err != nil {
 		fmt.Println("Error executing process:", err, exe, args)
 		os.Exit(1)
 	}
 	return nil
+}
+
+// removeFileIgnoreError removes a file and ignores any error (for temp file cleanup)
+func removeFileIgnoreError(filename string) {
+	_ = os.Remove(filename) // Ignore error for temp file cleanup
 }
 
 // promptForSecretValue prompts the user to enter a secret value securely

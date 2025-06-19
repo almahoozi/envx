@@ -91,7 +91,7 @@ func NewFileLoader() *FileLoader {
 
 // Load loads environment variables from a file
 func (l *FileLoader) Load(ctx context.Context, filename string) (Variables, error) {
-	file, err := os.Open(filename)
+	file, err := os.Open(filename) // #nosec G304 -- User-provided filename is intentional for env file loading
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Variables{}, nil // Return empty variables if file doesn't exist
@@ -180,7 +180,7 @@ func (w *FileWriter) Write(filename string, vars Variables, format Format) error
 		content = w.formatEnv(vars)
 	}
 
-	err := os.WriteFile(filename, []byte(content), 0o644)
+	err := os.WriteFile(filename, []byte(content), 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
