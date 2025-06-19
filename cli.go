@@ -8,7 +8,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/almahoozi/envx/pkg/crypto"
+	"github.com/almahoozi/envx/pkg/env"
 	flag "github.com/spf13/pflag"
+	"golang.org/x/term"
 )
 
 // TODO: Add support for subcommand and option autocomplete, as well as env keys
@@ -27,12 +30,13 @@ func (c *command[T]) execute(ctx context.Context, args ...string) error {
 	return c.fn(ctx, c.val, c.flags.Args()...)
 }
 
-type Format string
+// Use the Format type from the env package
+type Format = env.Format
 
 const (
-	FormatEnv  Format = "env"
-	FormatJSON Format = "json"
-	FormatYAML Format = "yaml"
+	FormatEnv  = env.FormatEnv
+	FormatJSON = env.FormatJSON
+	FormatYAML = env.FormatYAML
 )
 
 type fmtOpts struct {
@@ -219,38 +223,33 @@ func start() error {
 }
 
 func getVCmdFn(ctx context.Context, opts getVOpts, args ...string) error {
-	file := opts.File
-	if opts.Name != "" {
-		file = fmt.Sprintf("%s.%s", file, opts.Name)
-	}
+	file := env.BuildFilename(opts.File, opts.Name)
 
 	key, err := loadKey()
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
 
-	vars, err := loadDecryptedEnv(ctx, file, key)
+	encryptor := crypto.NewAESEncryptor()
+	vars, err := loadDecryptedEnv(ctx, file, encryptor, key)
 	if err != nil {
 		return fmt.Errorf("error loading %s file: %w", file, err)
 	}
 
-	varKeys := make(map[string]envVar, len(vars))
-	for _, v := range vars {
-		varKeys[v.key] = v
-	}
+	varMap := vars.ToMap()
 
 	vals := make([]string, 0, len(vars))
 	if len(args) == 0 {
 		for _, v := range vars {
-			vals = append(vals, v.value)
+			vals = append(vals, v.Value)
 		}
 		fmt.Println(strings.Join(vals, opts.Separator))
 		return nil
 	}
 
 	for _, arg := range args {
-		if v, exists := varKeys[arg]; exists {
-			vals = append(vals, v.value)
+		if value, exists := varMap[arg]; exists {
+			vals = append(vals, value)
 		} else {
 			return fmt.Errorf("variable %s not found in %s file", arg, file)
 		}
@@ -272,45 +271,40 @@ func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := opts.File
-	if opts.Name != "" {
-		file = fmt.Sprintf("%s.%s", file, opts.Name)
-	}
+	file := env.BuildFilename(opts.File, opts.Name)
 
 	key, err := loadKey()
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
 
-	vars, err := loadDecryptedEnv(ctx, file, key)
+	encryptor := crypto.NewAESEncryptor()
+	vars, err := loadDecryptedEnv(ctx, file, encryptor, key)
 	if err != nil {
 		return fmt.Errorf("error loading %s file: %w", file, err)
 	}
 
-	varKeys := make(map[string]envVar, len(vars))
-	for _, v := range vars {
-		varKeys[v.key] = v
-	}
+	varMap := vars.ToMap()
 
 	if len(args) == 0 {
 		for _, v := range vars {
 			switch format {
 			case FormatJSON:
-				fmt.Printf("%q:%q\n", v.key, v.value)
+				fmt.Printf("%q:%q\n", v.Key, v.Value)
 			default:
-				fmt.Printf("%s=%s\n", v.key, v.value)
+				fmt.Printf("%s=%s\n", v.Key, v.Value)
 			}
 		}
 		return nil
 	}
 
 	for _, arg := range args {
-		if v, exists := varKeys[arg]; exists {
+		if value, exists := varMap[arg]; exists {
 			switch format {
 			case FormatJSON:
-				fmt.Printf("%q:%q\n", v.key, v.value)
+				fmt.Printf("%q:%q\n", arg, value)
 			default:
-				fmt.Printf("%s=%s\n", v.key, v.value)
+				fmt.Printf("%s=%s\n", arg, value)
 			}
 		} else {
 			return fmt.Errorf("variable %s not found in %s file", arg, file)
@@ -328,10 +322,7 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := opts.File
-	if opts.Name != "" {
-		file = fmt.Sprintf("%s.%s", file, opts.Name)
-	}
+	file := env.BuildFilename(opts.File, opts.Name)
 
 	key, err := loadKey()
 	if err != nil {
@@ -343,54 +334,55 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 		return fmt.Errorf("error loading %s file: %w", file, err)
 	}
 
-	varKeys := make(map[string]int, len(vars))
-	for i, v := range vars {
-		varKeys[v.key] = i
+	// Parse arguments supporting both key=value and key-only formats
+	keyValues, err := parseKeyValueArgs(args)
+	if err != nil {
+		return fmt.Errorf("error parsing arguments: %w", err)
 	}
 
-	for _, arg := range args {
-		if strings.Contains(arg, "=") {
-			parts := strings.SplitN(arg, "=", 2)
-			k := strings.TrimSpace(parts[0])
-			v := strings.TrimSpace(parts[1])
-			ciphertext, err := encrypt(v, key)
-			if err != nil {
-				return fmt.Errorf("error encrypting value: %w", err)
-			}
-			if idx, exists := varKeys[k]; exists {
-				vars[idx].value = ciphertext
-			} else {
-				vars = append(vars, envVar{key: k, value: ciphertext})
-			}
-		} else {
-			return fmt.Errorf("invalid argument format: %s, expected key=value", arg)
-		}
-	}
+	encryptor := crypto.NewAESEncryptor()
 
-	var sb strings.Builder
-	jsonVars := make([]string, 0, len(vars))
-	for _, v := range vars {
-		switch format {
-		case FormatJSON:
-			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
-		default:
-			sb.WriteString(fmt.Sprintf("%s=%q\n", v.key, v.value))
-		}
-	}
-
-	if format == FormatJSON {
-		sb.WriteString("{")
-		sb.WriteString(strings.Join(jsonVars, ","))
-		sb.WriteString("}")
-	}
-
-	output := sb.String()
 	if opts.print {
-		fmt.Println(output)
+		// Create a new Variables slice with only the newly set values
+		newVars := make(env.Variables, 0, len(keyValues))
+		for k, v := range keyValues {
+			ciphertext, err := encryptor.Encrypt(v, key)
+			if err != nil {
+				return fmt.Errorf("error encrypting value for key %s: %w", k, err)
+			}
+			newVars = append(newVars, env.Variable{Key: k, Value: ciphertext})
+		}
+
+		writer := env.NewFileWriter()
+		// Use a temp file to get the output
+		tempFile, err := createTempFile()
+		if err != nil {
+			return err
+		}
+		err = writer.Write(tempFile, newVars, format)
+		if err != nil {
+			return fmt.Errorf("error formatting output: %w", err)
+		}
+		content, err := os.ReadFile(tempFile)
+		if err != nil {
+			return fmt.Errorf("error reading formatted output: %w", err)
+		}
+		removeFileIgnoreError(tempFile)
+		fmt.Print(string(content))
 		return nil
 	}
 
-	if err := os.WriteFile(file, []byte(output), 0o644); err != nil {
+	// If not printing, update the actual vars and write to file
+	for k, v := range keyValues {
+		ciphertext, err := encryptor.Encrypt(v, key)
+		if err != nil {
+			return fmt.Errorf("error encrypting value for key %s: %w", k, err)
+		}
+		vars.Set(k, ciphertext)
+	}
+
+	writer := env.NewFileWriter()
+	if err := writer.Write(file, vars, format); err != nil {
 		return fmt.Errorf("error writing %s file: %w", file, err)
 	}
 	return nil
@@ -405,10 +397,7 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := opts.File
-	if opts.Name != "" {
-		file = fmt.Sprintf("%s.%s", file, opts.Name)
-	}
+	file := env.BuildFilename(opts.File, opts.Name)
 
 	key, err := loadKey()
 	if err != nil {
@@ -420,54 +409,64 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 		return fmt.Errorf("error loading %s file: %w", file, err)
 	}
 
-	varKeys := make(map[string]bool, len(vars))
-	for _, v := range vars {
-		varKeys[v.key] = true
+	varMap := vars.ToMap()
+
+	// Parse arguments supporting both key=value and key-only formats
+	keyValues, err := parseKeyValueArgs(args)
+	if err != nil {
+		return fmt.Errorf("error parsing arguments: %w", err)
 	}
 
-	for _, arg := range args {
-		if strings.Contains(arg, "=") {
-			parts := strings.SplitN(arg, "=", 2)
-			k := strings.TrimSpace(parts[0])
-			if varKeys[k] {
-				return fmt.Errorf("variable %s already exists in %s file", k, file)
-			}
-
-			v := strings.TrimSpace(parts[1])
-			ciphertext, err := encrypt(v, key)
-			if err != nil {
-				return fmt.Errorf("error encrypting value: %w", err)
-			}
-			vars = append(vars, envVar{key: k, value: ciphertext})
-		} else {
-			return fmt.Errorf("invalid argument format: %s, expected key=value", arg)
+	// Check for existing keys first
+	for k := range keyValues {
+		if _, exists := varMap[k]; exists {
+			return fmt.Errorf("variable %s already exists in %s file", k, file)
 		}
 	}
 
-	var sb strings.Builder
-	jsonVars := make([]string, 0, len(vars))
-	for _, v := range vars {
-		switch format {
-		case FormatJSON:
-			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
-		default:
-			sb.WriteString(fmt.Sprintf("%s=%q\n", v.key, v.value))
-		}
-	}
+	encryptor := crypto.NewAESEncryptor()
 
-	if format == FormatJSON {
-		sb.WriteString("{")
-		sb.WriteString(strings.Join(jsonVars, ","))
-		sb.WriteString("}")
-	}
-
-	output := sb.String()
 	if opts.print {
-		fmt.Println(output)
+		// Create a new Variables slice with only the newly added values
+		newVars := make(env.Variables, 0, len(keyValues))
+		for k, v := range keyValues {
+			ciphertext, err := encryptor.Encrypt(v, key)
+			if err != nil {
+				return fmt.Errorf("error encrypting value for key %s: %w", k, err)
+			}
+			newVars = append(newVars, env.Variable{Key: k, Value: ciphertext})
+		}
+
+		writer := env.NewFileWriter()
+		// Use a temp file to get the output
+		tempFile, err := createTempFile()
+		if err != nil {
+			return err
+		}
+		err = writer.Write(tempFile, newVars, format)
+		if err != nil {
+			return fmt.Errorf("error formatting output: %w", err)
+		}
+		content, err := os.ReadFile(tempFile)
+		if err != nil {
+			return fmt.Errorf("error reading formatted output: %w", err)
+		}
+		removeFileIgnoreError(tempFile)
+		fmt.Print(string(content))
 		return nil
 	}
 
-	if err := os.WriteFile(file, []byte(output), 0o644); err != nil {
+	// If not printing, update the actual vars and write to file
+	for k, v := range keyValues {
+		ciphertext, err := encryptor.Encrypt(v, key)
+		if err != nil {
+			return fmt.Errorf("error encrypting value for key %s: %w", k, err)
+		}
+		vars.Set(k, ciphertext)
+	}
+
+	writer := env.NewFileWriter()
+	if err := writer.Write(file, vars, format); err != nil {
 		return fmt.Errorf("error writing %s file: %w", file, err)
 	}
 	return nil
@@ -482,10 +481,7 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := opts.File
-	if opts.Name != "" {
-		file = fmt.Sprintf("%s.%s", file, opts.Name)
-	}
+	file := env.BuildFilename(opts.File, opts.Name)
 
 	key, err := loadKey()
 	if err != nil {
@@ -503,42 +499,41 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 		argMap[arg] = true
 	}
 
+	encryptor := crypto.NewAESEncryptor()
+
 	for i, v := range vars {
 		// If it isn't already encrypted, encrypt it
-		if len(args) == 0 || argMap[v.key] {
-			ciphertext, err := encrypt(v.value, key)
+		if len(args) == 0 || argMap[v.Key] {
+			ciphertext, err := encryptor.Encrypt(v.Value, key)
 			if err != nil {
 				return fmt.Errorf("error encrypting value: %w", err)
 			}
-			vars[i].value = ciphertext
+			vars[i].Value = ciphertext
 		}
 	}
 
-	var sb strings.Builder
-	jsonVars := make([]string, 0, len(vars))
-	for _, v := range vars {
-		switch format {
-		case FormatJSON:
-			// WARN: Obviously this is not the safest as we don't check for duplicates
-			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
-		default:
-			sb.WriteString(fmt.Sprintf("%s=%q\n", v.key, v.value))
-		}
-	}
-
-	if format == FormatJSON {
-		sb.WriteString("{")
-		sb.WriteString(strings.Join(jsonVars, ","))
-		sb.WriteString("}")
-	}
-
-	output := sb.String()
 	if !opts.Write {
-		fmt.Println(output)
+		writer := env.NewFileWriter()
+		// Use a temp file to get the output
+		tempFile, err := createTempFile()
+		if err != nil {
+			return err
+		}
+		err = writer.Write(tempFile, vars, format)
+		if err != nil {
+			return fmt.Errorf("error formatting output: %w", err)
+		}
+		content, err := os.ReadFile(tempFile)
+		if err != nil {
+			return fmt.Errorf("error reading formatted output: %w", err)
+		}
+		removeFileIgnoreError(tempFile)
+		fmt.Print(string(content))
 		return nil
 	}
 
-	if err := os.WriteFile(file, []byte(output), 0o644); err != nil {
+	writer := env.NewFileWriter()
+	if err := writer.Write(file, vars, format); err != nil {
 		return fmt.Errorf("error writing %s file: %w", file, err)
 	}
 	return nil
@@ -553,10 +548,7 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := opts.File
-	if opts.Name != "" {
-		file = fmt.Sprintf("%s.%s", file, opts.Name)
-	}
+	file := env.BuildFilename(opts.File, opts.Name)
 
 	key, err := loadKey()
 	if err != nil {
@@ -574,41 +566,40 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 		argMap[arg] = true
 	}
 
+	encryptor := crypto.NewAESEncryptor()
+
 	for i, v := range vars {
-		if len(args) == 0 || argMap[v.key] {
-			plaintext, err := decrypt(v.value, key)
+		if len(args) == 0 || argMap[v.Key] {
+			plaintext, err := encryptor.Decrypt(v.Value, key)
 			if err != nil {
 				return fmt.Errorf("error decrypting value: %w", err)
 			}
-			vars[i].value = plaintext
+			vars[i].Value = plaintext
 		}
 	}
 
-	var sb strings.Builder
-	jsonVars := make([]string, 0, len(vars))
-	for _, v := range vars {
-		switch format {
-		case FormatJSON:
-			// WARN: Obviously this is not the safest as we don't check for duplicates
-			jsonVars = append(jsonVars, fmt.Sprintf("%q:%q", v.key, v.value))
-		default:
-			sb.WriteString(fmt.Sprintf("%s=%q\n", v.key, v.value))
-		}
-	}
-
-	if format == FormatJSON {
-		sb.WriteString("{")
-		sb.WriteString(strings.Join(jsonVars, ","))
-		sb.WriteString("}")
-	}
-
-	output := sb.String()
 	if !opts.Write {
-		fmt.Println(output)
+		writer := env.NewFileWriter()
+		// Use a temp file to get the output
+		tempFile, err := createTempFile()
+		if err != nil {
+			return err
+		}
+		err = writer.Write(tempFile, vars, format)
+		if err != nil {
+			return fmt.Errorf("error formatting output: %w", err)
+		}
+		content, err := os.ReadFile(tempFile)
+		if err != nil {
+			return fmt.Errorf("error reading formatted output: %w", err)
+		}
+		removeFileIgnoreError(tempFile)
+		fmt.Print(string(content))
 		return nil
 	}
 
-	if err := os.WriteFile(file, []byte(output), 0o644); err != nil {
+	writer := env.NewFileWriter()
+	if err := writer.Write(file, vars, format); err != nil {
 		return fmt.Errorf("error writing %s file: %w", file, err)
 	}
 	return nil
@@ -621,10 +612,7 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 
 	exe := args[0]
 
-	file := opts.File
-	if opts.Name != "" {
-		file = fmt.Sprintf("%s.%s", file, opts.Name)
-	}
+	file := env.BuildFilename(opts.File, opts.Name)
 
 	// TODO: Move out
 	key, err := loadKey()
@@ -632,14 +620,15 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 		return fmt.Errorf("error loading key: %w", err)
 	}
 
-	vars, err := loadDecryptedEnv(ctx, file, key)
+	encryptor := crypto.NewAESEncryptor()
+	vars, err := loadDecryptedEnv(ctx, file, encryptor, key)
 	if err != nil {
 		return fmt.Errorf("error loading env file: %w", err)
 	}
 
 	for _, v := range vars {
-		if err := os.Setenv(v.key, v.value); err != nil {
-			return fmt.Errorf("error setting env var %s: %w", v.key, err)
+		if err := os.Setenv(v.Key, v.Value); err != nil {
+			return fmt.Errorf("error setting env var %s: %w", v.Key, err)
 		}
 	}
 
@@ -660,10 +649,73 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 	  }
 	*/
 
-	err = syscall.Exec(exe, args, os.Environ())
+	err = syscall.Exec(exe, args, os.Environ()) // #nosec G204 -- Intentional subprocess execution with validated executable path
 	if err != nil {
 		fmt.Println("Error executing process:", err, exe, args)
 		os.Exit(1)
 	}
 	return nil
+}
+
+// removeFileIgnoreError removes a file and ignores any error (for temp file cleanup)
+func removeFileIgnoreError(filename string) {
+	_ = os.Remove(filename) // Ignore error for temp file cleanup
+}
+
+// createTempFile creates a temporary file and returns its name
+func createTempFile() (string, error) {
+	tempFile, err := os.CreateTemp("", "envx_temp_output_*")
+	if err != nil {
+		return "", fmt.Errorf("error creating temp file: %w", err)
+	}
+	tempFileName := tempFile.Name()
+	tempFile.Close()
+	return tempFileName, nil
+}
+
+// promptForSecretValue prompts the user to enter a secret value securely
+func promptForSecretValue(key string) (string, error) {
+	fmt.Printf("Enter value for %s: ", key)
+
+	// Read password without echoing to terminal
+	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return "", fmt.Errorf("failed to read password: %w", err)
+	}
+
+	fmt.Println() // Print newline after password input
+	return string(bytePassword), nil
+}
+
+// parseKeyValueArgs parses arguments that can be either "key=value" or just "key"
+// For keys without values, it prompts securely for the value
+func parseKeyValueArgs(args []string) (map[string]string, error) {
+	result := make(map[string]string)
+
+	for _, arg := range args {
+		if strings.Contains(arg, "=") {
+			// Handle key=value format
+			parts := strings.SplitN(arg, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			if key == "" {
+				return nil, fmt.Errorf("empty key in argument: %s", arg)
+			}
+			result[key] = value
+		} else {
+			// Handle key-only format - prompt for value
+			key := strings.TrimSpace(arg)
+			if key == "" {
+				return nil, fmt.Errorf("empty key: %s", arg)
+			}
+
+			value, err := promptForSecretValue(key)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get value for key %s: %w", key, err)
+			}
+			result[key] = value
+		}
+	}
+
+	return result, nil
 }
