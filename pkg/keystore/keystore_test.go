@@ -122,7 +122,9 @@ func TestMockKeyStore_GetKey(t *testing.T) {
 
 	// Test existing key
 	testKey := make([]byte, crypto.KeySize)
-	rand.Read(testKey)
+	if _, err := rand.Read(testKey); err != nil {
+		t.Fatal(err)
+	}
 	store.keys["test"] = testKey
 
 	retrievedKey, err := store.GetKey("test")
@@ -188,7 +190,9 @@ func TestMockKeyStore_SetKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.key != nil && len(tt.key) == crypto.KeySize {
-				rand.Read(tt.key) // Fill with random data
+				if _, err := rand.Read(tt.key); err != nil {
+					t.Fatal(err)
+				} // Fill with random data
 			}
 
 			err := store.SetKey(tt.account, tt.key)
@@ -389,7 +393,9 @@ func TestKeyStoreOperations(t *testing.T) {
 
 			// Test SetKey with new key
 			newKey := make([]byte, crypto.KeySize)
-			rand.Read(newKey)
+			if _, err := rand.Read(newKey); err != nil {
+				t.Fatal(err)
+			}
 
 			err = store.SetKey(account+"2", newKey)
 			if err != nil {

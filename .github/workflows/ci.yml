@@ -117,7 +117,7 @@ jobs:
         go-version-file: 'go.mod'
 
     - name: Install gosec
-      run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+      run: go install github.com/securecodewarrior/gosec/cmd/gosec@latest
 
     - name: Run Gosec Security Scanner
       run: gosec -fmt sarif -out gosec.sarif ./...
@@ -146,8 +146,13 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Build binary
+    - name: Build binary (Unix)
+      if: runner.os != 'Windows'
       run: go build -v -ldflags="-s -w" -o envx .
+
+    - name: Build binary (Windows)
+      if: runner.os == 'Windows'
+      run: go build -v -ldflags="-s -w" -o envx.exe .
 
     - name: Test binary (Unix)
       if: runner.os != 'Windows'

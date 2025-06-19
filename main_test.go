@@ -169,26 +169,12 @@ func generateTestKey(t *testing.T) []byte {
 	return key
 }
 
-// loadTestKey loads or creates a test-specific encryption key that doesn't interfere with production
-func loadTestKey(t *testing.T) []byte {
-	t.Helper()
-
-	testConfig := &keystore.Config{
-		App:     "envx.test",
-		Service: "com.almahoozi.envx.test",
-	}
-
-	key, err := loadKeyWithConfig(testConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return key
-}
-
 // setupTestKeystore configures the global keystore to use test-specific keychain items
 func setupTestKeystore(t *testing.T) {
 	t.Helper()
+
+	// Use mock keystore for all tests to avoid platform dependencies
+	testKeystore = keystore.NewMockKeyStore()
 
 	testKeystoreConfig = &keystore.Config{
 		App:     "envx.test",
@@ -200,5 +186,6 @@ func setupTestKeystore(t *testing.T) {
 func teardownTestKeystore(t *testing.T) {
 	t.Helper()
 
+	testKeystore = nil
 	testKeystoreConfig = nil
 }

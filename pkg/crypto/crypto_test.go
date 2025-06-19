@@ -16,7 +16,9 @@ func TestNewAESEncryptor(t *testing.T) {
 func TestAESEncryptor_Encrypt(t *testing.T) {
 	encryptor := NewAESEncryptor()
 	key := make([]byte, KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name      string
@@ -105,7 +107,9 @@ func TestAESEncryptor_Encrypt(t *testing.T) {
 func TestAESEncryptor_Decrypt(t *testing.T) {
 	encryptor := NewAESEncryptor()
 	key := make([]byte, KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name      string
@@ -170,7 +174,9 @@ func TestAESEncryptor_Decrypt(t *testing.T) {
 			setupFunc: func(plain string, k []byte) string {
 				// Use valid key for encryption, invalid for decryption
 				validKey := make([]byte, KeySize)
-				rand.Read(validKey)
+				if _, err := rand.Read(validKey); err != nil {
+					t.Fatal(err)
+				}
 				encrypted, _ := encryptor.Encrypt(plain, validKey)
 				return encrypted
 			},
@@ -205,7 +211,9 @@ func TestAESEncryptor_Decrypt(t *testing.T) {
 func TestAESEncryptor_IsEncrypted(t *testing.T) {
 	encryptor := NewAESEncryptor()
 	key := make([]byte, KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
 
 	// Test unencrypted data
 	unencryptedData := []string{
@@ -248,7 +256,9 @@ func TestAESEncryptor_IsEncrypted(t *testing.T) {
 func TestAESEncryptor_EncryptDecryptRoundTrip(t *testing.T) {
 	encryptor := NewAESEncryptor()
 	key := make([]byte, KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
 
 	testCases := []string{
 		"hello world",
@@ -290,7 +300,9 @@ func TestAESEncryptor_EncryptDecryptRoundTrip(t *testing.T) {
 func TestAESEncryptor_EncryptTwiceSameResult(t *testing.T) {
 	encryptor := NewAESEncryptor()
 	key := make([]byte, KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
 
 	plaintext := "test data"
 
@@ -316,8 +328,12 @@ func TestAESEncryptor_DifferentKeysProduceDifferentResults(t *testing.T) {
 
 	key1 := make([]byte, KeySize)
 	key2 := make([]byte, KeySize)
-	rand.Read(key1)
-	rand.Read(key2)
+	if _, err := rand.Read(key1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rand.Read(key2); err != nil {
+		t.Fatal(err)
+	}
 
 	plaintext := "test data"
 
@@ -361,7 +377,9 @@ func TestConstants(t *testing.T) {
 func BenchmarkAESEncryptor_Encrypt(b *testing.B) {
 	encryptor := NewAESEncryptor()
 	key := make([]byte, KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		b.Fatal(err)
+	}
 	plaintext := "benchmark test data"
 
 	b.ResetTimer()
@@ -376,7 +394,9 @@ func BenchmarkAESEncryptor_Encrypt(b *testing.B) {
 func BenchmarkAESEncryptor_Decrypt(b *testing.B) {
 	encryptor := NewAESEncryptor()
 	key := make([]byte, KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		b.Fatal(err)
+	}
 	plaintext := "benchmark test data"
 
 	encrypted, err := encryptor.Encrypt(plaintext, key)

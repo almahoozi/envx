@@ -299,7 +299,9 @@ func TestFileLoader_LoadWithDecryption(t *testing.T) {
 
 	// Generate a test key
 	key := make([]byte, crypto.KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a temporary directory for test files
 	tempDir, err := os.MkdirTemp("", "envx_test")
@@ -649,7 +651,9 @@ func TestIntegration_EncryptionRoundTrip(t *testing.T) {
 
 	// Generate a test key
 	key := make([]byte, crypto.KeySize)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a temporary directory for test files
 	tempDir, err := os.MkdirTemp("", "envx_test")

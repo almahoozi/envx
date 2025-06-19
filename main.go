@@ -15,6 +15,9 @@ import (
 // testKeystoreConfig can be set during tests to use a different keychain item
 var testKeystoreConfig *keystore.Config
 
+// testKeystore can be set during tests to use a mock keystore
+var testKeystore keystore.KeyStore
+
 //go:embed envx.1
 var man string
 
@@ -51,7 +54,15 @@ func loadKeyWithConfig(config *keystore.Config) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get current user: %w", err)
 	}
 
-	store := keystore.NewMacOSKeyStore(config)
+	var store keystore.KeyStore
+	if testKeystore != nil {
+		// Use test keystore if set (for testing)
+		store = testKeystore
+	} else {
+		// Use production keystore
+		store = keystore.NewMacOSKeyStore(config)
+	}
+
 	key, err := store.LoadOrCreateKey(user.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load or create key: %w", err)
