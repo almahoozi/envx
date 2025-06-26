@@ -17,6 +17,8 @@ import (
 // TODO: Add support for subcommand and option autocomplete, as well as env keys
 // Load from JSON into env :shrug:
 
+var emptyPassword = string([]byte{1})
+
 type command[T any] struct {
 	flags *flag.FlagSet
 	fn    func(context.Context, T, ...string) error
@@ -86,36 +88,46 @@ func (opts *fmtOpts) Format() (Format, error) {
 }
 
 type encryptOpts struct {
-	Name    string
-	File    string
-	FmtOpts *fmtOpts
-	Write   bool
+	Name     string
+	File     string
+	KeyStore string
+	Password string
+	FmtOpts  *fmtOpts
+	Write    bool
 }
 
 type decryptOpts struct {
-	Name    string
-	File    string
-	FmtOpts *fmtOpts
-	Write   bool
+	Name     string
+	File     string
+	KeyStore string
+	Password string
+	FmtOpts  *fmtOpts
+	Write    bool
 }
 
 type addOpts struct {
-	Name    string
-	File    string
-	FmtOpts *fmtOpts
-	print   bool
+	Name     string
+	File     string
+	KeyStore string
+	Password string
+	FmtOpts  *fmtOpts
+	print    bool
 }
 
 type setOpts struct {
-	Name    string
-	File    string
-	FmtOpts *fmtOpts
-	print   bool
+	Name     string
+	File     string
+	KeyStore string
+	Password string
+	FmtOpts  *fmtOpts
+	print    bool
 }
 
 type getOpts struct {
 	Name       string
 	File       string
+	KeyStore   string
+	Password   string
 	FmtOpts    *fmtOpts
 	ValuesOnly bool
 }
@@ -123,13 +135,17 @@ type getOpts struct {
 type getVOpts struct {
 	Name      string
 	File      string
+	KeyStore  string
+	Password  string
 	Separator string
 }
 
 type runOpts struct {
-	Name string
-	File string
-	Args []string
+	Name     string
+	File     string
+	KeyStore string
+	Password string
+	Args     []string
 }
 
 type executor interface {
@@ -151,6 +167,9 @@ func start() error {
 	runCmd.flags = flag.NewFlagSet("run", flag.ExitOnError)
 	runCmd.flags.StringVarP(&runCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	runCmd.flags.StringVarP(&runCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	runCmd.flags.StringVarP(&runCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	runCmd.flags.StringVarP(&runCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	runCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	runCmd.fn = run
 	cmds[runCmd.flags.Name()] = runCmd
 
@@ -158,6 +177,9 @@ func start() error {
 	encCmd.flags = flag.NewFlagSet("encrypt", flag.ExitOnError)
 	encCmd.flags.StringVarP(&encCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	encCmd.flags.StringVarP(&encCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	encCmd.flags.StringVarP(&encCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	encCmd.flags.StringVarP(&encCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	encCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	encCmd.val.FmtOpts = NewFmtOpts(encCmd.flags)
 	encCmd.flags.BoolVarP(&encCmd.val.Write, "write", "w", false, "Overwrites the file with encrypted values.")
 	encCmd.fn = encryptCmd
@@ -167,6 +189,9 @@ func start() error {
 	decCmd.flags = flag.NewFlagSet("decrypt", flag.ExitOnError)
 	decCmd.flags.StringVarP(&decCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	decCmd.flags.StringVarP(&decCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	decCmd.flags.StringVarP(&decCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	decCmd.flags.StringVarP(&decCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	decCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	decCmd.val.FmtOpts = NewFmtOpts(decCmd.flags)
 	decCmd.flags.BoolVarP(&decCmd.val.Write, "write", "w", false, "Overwrites the file with decrypted values.")
 	decCmd.fn = decryptCmd
@@ -176,6 +201,9 @@ func start() error {
 	addCmd.flags = flag.NewFlagSet("add", flag.ExitOnError)
 	addCmd.flags.StringVarP(&addCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	addCmd.flags.StringVarP(&addCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	addCmd.flags.StringVarP(&addCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	addCmd.flags.StringVarP(&addCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	addCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	addCmd.val.FmtOpts = NewFmtOpts(addCmd.flags)
 	addCmd.flags.BoolVarP(&addCmd.val.print, "print", "p", false, "Prints the output instead of writing to the file.")
 	addCmd.fn = addCmdFn
@@ -185,6 +213,9 @@ func start() error {
 	setCmd.flags = flag.NewFlagSet("set", flag.ExitOnError)
 	setCmd.flags.StringVarP(&setCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	setCmd.flags.StringVarP(&setCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	setCmd.flags.StringVarP(&setCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	setCmd.flags.StringVarP(&setCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	setCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	setCmd.val.FmtOpts = NewFmtOpts(setCmd.flags)
 	setCmd.flags.BoolVarP(&setCmd.val.print, "print", "p", false, "Prints the output instead of writing to the file.")
 	setCmd.fn = setCmdFn
@@ -194,6 +225,9 @@ func start() error {
 	getCmd.flags = flag.NewFlagSet("get", flag.ExitOnError)
 	getCmd.flags.StringVarP(&getCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	getCmd.flags.StringVarP(&getCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	getCmd.flags.StringVarP(&getCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	getCmd.flags.StringVarP(&getCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	getCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	getCmd.flags.BoolVarP(&getCmd.val.ValuesOnly, "vals", "v", false, "Prints only the values without keys. Use getv command instead to set a custom separator. Ignores formatting options.")
 	getCmd.val.FmtOpts = NewFmtOpts(getCmd.flags)
 	getCmd.fn = getCmdFn
@@ -203,6 +237,9 @@ func start() error {
 	getVCmd.flags = flag.NewFlagSet("getv", flag.ExitOnError)
 	getVCmd.flags.StringVarP(&getVCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	getVCmd.flags.StringVarP(&getVCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
+	getVCmd.flags.StringVarP(&getVCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	getVCmd.flags.StringVarP(&getVCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	getVCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	getVCmd.flags.StringVarP(&getVCmd.val.Separator, "separator", "s", "\n", "Separator for the values (default is new line)")
 	getVCmd.fn = getVCmdFn
 	cmds[getVCmd.flags.Name()] = getVCmd
@@ -225,7 +262,7 @@ func start() error {
 func getVCmdFn(ctx context.Context, opts getVOpts, args ...string) error {
 	file := env.BuildFilename(opts.File, opts.Name)
 
-	key, err := loadKey()
+	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -260,7 +297,7 @@ func getVCmdFn(ctx context.Context, opts getVOpts, args ...string) error {
 
 func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
 	if opts.ValuesOnly {
-		return getVCmdFn(ctx, getVOpts{opts.Name, opts.File, "\n"}, args...)
+		return getVCmdFn(ctx, getVOpts{opts.Name, opts.File, opts.KeyStore, opts.Password, "\n"}, args...)
 	}
 
 	format, err := opts.FmtOpts.Format()
@@ -273,7 +310,7 @@ func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
 
 	file := env.BuildFilename(opts.File, opts.Name)
 
-	key, err := loadKey()
+	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -324,7 +361,7 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 
 	file := env.BuildFilename(opts.File, opts.Name)
 
-	key, err := loadKey()
+	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -399,7 +436,7 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 
 	file := env.BuildFilename(opts.File, opts.Name)
 
-	key, err := loadKey()
+	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -483,7 +520,7 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 
 	file := env.BuildFilename(opts.File, opts.Name)
 
-	key, err := loadKey()
+	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -550,7 +587,7 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 
 	file := env.BuildFilename(opts.File, opts.Name)
 
-	key, err := loadKey()
+	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -615,7 +652,7 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 	file := env.BuildFilename(opts.File, opts.Name)
 
 	// TODO: Move out
-	key, err := loadKey()
+	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}

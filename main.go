@@ -40,15 +40,72 @@ func loadDecryptedEnv(ctx context.Context, filename string, encryptor crypto.Enc
 	return loader.LoadWithDecryption(ctx, filename, encryptor, key)
 }
 
+// KeyStoreType represents the type of keystore to use
+type KeyStoreType string
+
+const (
+	KeyStoreTypeMacOS    KeyStoreType = "macos"
+	KeyStoreTypePassword KeyStoreType = "password"
+	KeyStoreTypeMock     KeyStoreType = "mock"
+)
+
+// avoid unused lint errors
+var (
+	_ = loadKey
+	_ = loadKeyWithStringType
+)
+
 // loadKey loads or creates an encryption key using the default keystore
 func loadKey() ([]byte, error) {
-	// Use test config if set (for testing), otherwise use default
-	config := testKeystoreConfig
-	return loadKeyWithConfig(config)
+	return loadKeyWithType(KeyStoreTypeMacOS)
 }
 
-// loadKeyWithConfig loads or creates an encryption key using the specified keystore config
-func loadKeyWithConfig(config *keystore.Config) ([]byte, error) {
+// loadKeyWithStringType loads or creates an encryption key using the specified keystore type string
+func loadKeyWithStringType(storeTypeStr string) ([]byte, error) {
+	return loadKeyWithStringTypeAndPassword(storeTypeStr, "")
+}
+
+// loadKeyWithStringTypeAndPassword loads or creates an encryption key using the specified keystore type string and password
+func loadKeyWithStringTypeAndPassword(storeTypeStr, password string) ([]byte, error) {
+	// As a workaround we set the password to byte(1) if it is empty using -P
+	if password == emptyPassword {
+		storeTypeStr = "password"
+		password = ""
+	}
+
+	// Auto-detect password keystore if password is provided or ENVX_PASSWORD is set
+	if password != "" || os.Getenv("ENVX_PASSWORD") != "" {
+		storeTypeStr = "password"
+	}
+
+	storeType, err := parseKeyStoreType(storeTypeStr)
+	if err != nil {
+		return nil, err
+	}
+	return loadKeyWithTypeAndPassword(storeType, password)
+}
+
+// parseKeyStoreType converts a string to KeyStoreType
+func parseKeyStoreType(storeTypeStr string) (KeyStoreType, error) {
+	switch storeTypeStr {
+	case "macos":
+		return KeyStoreTypeMacOS, nil
+	case "password":
+		return KeyStoreTypePassword, nil
+	case "mock":
+		return KeyStoreTypeMock, nil
+	default:
+		return "", fmt.Errorf("unsupported keystore type: %s (supported: macos, password, mock)", storeTypeStr)
+	}
+}
+
+// loadKeyWithType loads or creates an encryption key using the specified keystore type
+func loadKeyWithType(storeType KeyStoreType) ([]byte, error) {
+	return loadKeyWithTypeAndPassword(storeType, "")
+}
+
+// loadKeyWithTypeAndPassword loads or creates an encryption key using the specified keystore type and optional password
+func loadKeyWithTypeAndPassword(storeType KeyStoreType, password string) ([]byte, error) {
 	user, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user: %w", err)
@@ -59,8 +116,22 @@ func loadKeyWithConfig(config *keystore.Config) ([]byte, error) {
 		// Use test keystore if set (for testing)
 		store = testKeystore
 	} else {
-		// Use production keystore
-		store = keystore.NewMacOSKeyStore(config)
+		// Use production keystore based on type
+		switch storeType {
+		case KeyStoreTypePassword:
+			config := &keystore.PasswordKeyStoreConfig{
+				Password: password,
+			}
+			store = keystore.NewPasswordKeyStore(config)
+		case KeyStoreTypeMock:
+			store = keystore.NewMockKeyStore()
+		case KeyStoreTypeMacOS:
+			fallthrough
+		default:
+			// Use test config if set (for testing), otherwise use default
+			config := testKeystoreConfig
+			store = keystore.NewMacOSKeyStore(config)
+		}
 	}
 
 	key, err := store.LoadOrCreateKey(user.Username)

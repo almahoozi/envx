@@ -144,6 +144,7 @@ KEY3=value3`
 			opts: getVOpts{
 				File:      envFile,
 				Name:      "",
+				KeyStore:  "mock",
 				Separator: "\n",
 			},
 			args:      []string{},
@@ -155,6 +156,7 @@ KEY3=value3`
 			opts: getVOpts{
 				File:      envFile,
 				Name:      "",
+				KeyStore:  "mock",
 				Separator: ",",
 			},
 			args:      []string{"KEY1", "KEY3"},
@@ -166,6 +168,7 @@ KEY3=value3`
 			opts: getVOpts{
 				File:      envFile,
 				Name:      "",
+				KeyStore:  "mock",
 				Separator: "\n",
 			},
 			args:    []string{"NONEXISTENT"},
@@ -228,6 +231,7 @@ KEY3=value3`
 			opts: getOpts{
 				File:       envFile,
 				Name:       "",
+				KeyStore:   "mock",
 				FmtOpts:    &fmtOpts{format: "env"},
 				ValuesOnly: false,
 			},
@@ -239,6 +243,7 @@ KEY3=value3`
 			opts: getOpts{
 				File:       envFile,
 				Name:       "",
+				KeyStore:   "mock",
 				FmtOpts:    &fmtOpts{json: true},
 				ValuesOnly: false,
 			},
@@ -250,6 +255,7 @@ KEY3=value3`
 			opts: getOpts{
 				File:       envFile,
 				Name:       "",
+				KeyStore:   "mock",
 				FmtOpts:    &fmtOpts{},
 				ValuesOnly: true,
 			},
@@ -261,6 +267,7 @@ KEY3=value3`
 			opts: getOpts{
 				File:       envFile,
 				Name:       "",
+				KeyStore:   "mock",
 				FmtOpts:    &fmtOpts{yaml: true},
 				ValuesOnly: false,
 			},
@@ -318,10 +325,11 @@ KEY2=value2`
 		{
 			name: "set existing key",
 			opts: setOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{format: "env"},
-				print:   true,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{format: "env"},
+				print:    true,
 			},
 			args:    []string{"KEY1=new_value1"},
 			wantErr: false,
@@ -329,10 +337,11 @@ KEY2=value2`
 		{
 			name: "set new key",
 			opts: setOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{json: true},
-				print:   true,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{json: true},
+				print:    true,
 			},
 			args:    []string{"NEW_KEY=new_value"},
 			wantErr: false,
@@ -340,10 +349,11 @@ KEY2=value2`
 		{
 			name: "key only format - would prompt for input",
 			opts: setOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{},
-				print:   true,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{},
+				print:    true,
 			},
 			args:    []string{"KEY_ONLY"},
 			wantErr: true, // Will fail in test because it tries to read from stdin
@@ -351,10 +361,11 @@ KEY2=value2`
 		{
 			name: "yaml format - unsupported",
 			opts: setOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{yaml: true},
-				print:   true,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{yaml: true},
+				print:    true,
 			},
 			args:    []string{"KEY=value"},
 			wantErr: true,
@@ -410,10 +421,11 @@ KEY2=value2`
 		{
 			name: "add new key",
 			opts: addOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{format: "env"},
-				print:   true,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{format: "env"},
+				print:    true,
 			},
 			args:    []string{"NEW_KEY=new_value"},
 			wantErr: false,
@@ -421,10 +433,11 @@ KEY2=value2`
 		{
 			name: "add existing key - should fail",
 			opts: addOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{},
-				print:   true,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{},
+				print:    true,
 			},
 			args:    []string{"KEY1=new_value"},
 			wantErr: true,
@@ -432,10 +445,11 @@ KEY2=value2`
 		{
 			name: "key only format - would prompt for input",
 			opts: addOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{},
-				print:   true,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{},
+				print:    true,
 			},
 			args:    []string{"KEY_ONLY"},
 			wantErr: true, // Will fail in test because it tries to read from stdin
@@ -492,10 +506,11 @@ PLAIN=plain_value`
 		{
 			name: "encrypt all values",
 			opts: encryptOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{format: "env"},
-				Write:   false,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{format: "env"},
+				Write:    false,
 			},
 			args:    []string{},
 			wantErr: false,
@@ -503,10 +518,11 @@ PLAIN=plain_value`
 		{
 			name: "encrypt specific values",
 			opts: encryptOpts{
-				File:    envFile,
-				Name:    "",
-				FmtOpts: &fmtOpts{json: true},
-				Write:   false,
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
+				FmtOpts:  &fmtOpts{json: true},
+				Write:    false,
 			},
 			args:    []string{"SECRET1", "SECRET2"},
 			wantErr: false,
@@ -575,8 +591,9 @@ ANOTHER_VAR=another_value`
 		{
 			name: "missing executable",
 			opts: runOpts{
-				File: envFile,
-				Name: "",
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
 			},
 			args:    []string{},
 			wantErr: true,
@@ -584,8 +601,9 @@ ANOTHER_VAR=another_value`
 		{
 			name: "non-existent executable",
 			opts: runOpts{
-				File: envFile,
-				Name: "",
+				File:     envFile,
+				Name:     "",
+				KeyStore: "mock",
 			},
 			args:    []string{"non_existent_executable_12345"},
 			wantErr: true,
@@ -631,10 +649,11 @@ func TestCommandExecutionFlow(t *testing.T) {
 	t.Run("full_workflow", func(t *testing.T) {
 		// Step 1: Add a new variable
 		addOpts := addOpts{
-			File:    envFile,
-			Name:    "",
-			FmtOpts: &fmtOpts{format: "env"},
-			print:   false,
+			File:     envFile,
+			Name:     "",
+			KeyStore: "mock",
+			FmtOpts:  &fmtOpts{format: "env"},
+			print:    false,
 		}
 
 		err := addCmdFn(context.Background(), addOpts, "SECRET=my_secret_value")
@@ -654,10 +673,11 @@ func TestCommandExecutionFlow(t *testing.T) {
 
 		// Step 2: Encrypt the variable
 		encryptOpts := encryptOpts{
-			File:    envFile,
-			Name:    "",
-			FmtOpts: &fmtOpts{format: "env"},
-			Write:   true,
+			File:     envFile,
+			Name:     "",
+			KeyStore: "mock",
+			FmtOpts:  &fmtOpts{format: "env"},
+			Write:    true,
 		}
 
 		err = encryptCmd(context.Background(), encryptOpts, "SECRET")
@@ -677,10 +697,11 @@ func TestCommandExecutionFlow(t *testing.T) {
 
 		// Step 3: Decrypt and verify
 		decryptOpts := decryptOpts{
-			File:    envFile,
-			Name:    "",
-			FmtOpts: &fmtOpts{format: "env"},
-			Write:   false,
+			File:     envFile,
+			Name:     "",
+			KeyStore: "mock",
+			FmtOpts:  &fmtOpts{format: "env"},
+			Write:    false,
 		}
 
 		err = decryptCmd(context.Background(), decryptOpts)
@@ -692,6 +713,7 @@ func TestCommandExecutionFlow(t *testing.T) {
 		getOpts := getOpts{
 			File:       envFile,
 			Name:       "",
+			KeyStore:   "mock",
 			FmtOpts:    &fmtOpts{format: "env"},
 			ValuesOnly: false,
 		}
