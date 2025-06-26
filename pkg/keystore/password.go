@@ -22,18 +22,21 @@ const (
 type PasswordKeyStore struct {
 	iterations int
 	promptFunc func(string) (string, error) // For dependency injection in tests
+	password   string                       // Optional: password for non-interactive use
 }
 
 // PasswordKeyStoreConfig holds configuration for password-based keystore
 type PasswordKeyStoreConfig struct {
 	Iterations int
 	PromptFunc func(string) (string, error)
+	Password   string // Optional: password for non-interactive use
 }
 
 // NewPasswordKeyStore creates a new password-based keystore
 func NewPasswordKeyStore(config *PasswordKeyStoreConfig) KeyStore {
 	iterations := DefaultIterations
 	promptFunc := promptForPassword
+	password := ""
 
 	if config != nil {
 		if config.Iterations > 0 {
@@ -42,17 +45,21 @@ func NewPasswordKeyStore(config *PasswordKeyStoreConfig) KeyStore {
 		if config.PromptFunc != nil {
 			promptFunc = config.PromptFunc
 		}
+		if config.Password != "" {
+			password = config.Password
+		}
 	}
 
 	return &PasswordKeyStore{
 		iterations: iterations,
 		promptFunc: promptFunc,
+		password:   password,
 	}
 }
 
-// GetKey derives a key from password (password is prompted from user)
+// GetKey derives a key from password (password is prompted from user or taken from config)
 func (p *PasswordKeyStore) GetKey(account string) ([]byte, error) {
-	password, err := p.promptFunc(fmt.Sprintf("Enter password for %s", account))
+	password, err := p.getPassword(fmt.Sprintf("Enter password for %s", account))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
@@ -86,20 +93,22 @@ func (p *PasswordKeyStore) CreateKey(account string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to store salt: %w", err)
 	}
 
-	// Prompt for password and derive key
-	password, err := p.promptFunc(fmt.Sprintf("Create password for %s", account))
+	// Get password (from env var, config, or prompt)
+	password, err := p.getPassword(fmt.Sprintf("Create password for %s", account))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
 
-	// Confirm password
-	confirmPassword, err := p.promptFunc(fmt.Sprintf("Confirm password for %s", account))
-	if err != nil {
-		return nil, fmt.Errorf("failed to confirm password: %w", err)
-	}
+	// Only confirm password if we're prompting interactively
+	if p.password == "" && os.Getenv("ENVX_PASSWORD") == "" {
+		confirmPassword, err := p.promptFunc(fmt.Sprintf("Confirm password for %s", account))
+		if err != nil {
+			return nil, fmt.Errorf("failed to confirm password: %w", err)
+		}
 
-	if password != confirmPassword {
-		return nil, fmt.Errorf("passwords do not match")
+		if password != confirmPassword {
+			return nil, fmt.Errorf("passwords do not match")
+		}
 	}
 
 	key := pbkdf2.Key([]byte(password), salt, p.iterations, crypto.KeySize, sha256.New)
@@ -185,4 +194,20 @@ func promptForPassword(prompt string) (string, error) {
 
 	fmt.Println() // Print newline after password input
 	return string(bytePassword), nil
+}
+
+// getPassword returns the configured password or prompts for one
+func (p *PasswordKeyStore) getPassword(prompt string) (string, error) {
+	// Check environment variable first
+	if envPassword := os.Getenv("ENVX_PASSWORD"); envPassword != "" {
+		return envPassword, nil
+	}
+
+	// Use configured password if available
+	if p.password != "" {
+		return p.password, nil
+	}
+
+	// Fall back to prompting
+	return p.promptFunc(prompt)
 }

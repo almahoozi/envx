@@ -21,7 +21,17 @@
 - [x] Cross-platform support (works on Linux/Windows/macOS)
 - [x] Configurable key derivation parameters
 
+### Key selection
+- [ ] Allow selecting the name of the key in the key store
+- [ ] Allow exporting/importing keys / salts, etc.
+
 ## Priority 2: Shell Integration
+
+### Persistent Configuration
+- [ ] Allow setting defaults for different options
+- [ ] Allow listing all configs, inluding whether or not the config is a default or override
+- [ ] Allow a directory level config override; global config sits in the XDG but if there is
+a relevant file in the current dir it merges on top of that
 
 ### Auto-completion
 - [ ] Command and option completion for bash/zsh/fish

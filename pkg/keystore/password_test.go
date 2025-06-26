@@ -287,3 +287,149 @@ func TestPasswordKeyStore_Constants(t *testing.T) {
 		t.Errorf("SaltSize should be at least 16 bytes for security, got %d", SaltSize)
 	}
 }
+
+func TestPasswordKeyStore_NonInteractivePassword(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Test with password provided in config
+	config := &PasswordKeyStoreConfig{
+		Iterations: 1000,
+		Password:   "testpassword123",
+	}
+
+	store := NewPasswordKeyStore(config).(*PasswordKeyStore)
+
+	// Override salt directory for testing
+	originalGetSaltDir := getSaltDir
+	defer func() { getSaltDir = originalGetSaltDir }()
+	getSaltDir = func() string { return tempDir }
+
+	account := "testaccount"
+
+	// Create key should work without prompting
+	key1, err := store.CreateKey(account)
+	if err != nil {
+		t.Fatalf("CreateKey failed: %v", err)
+	}
+
+	if len(key1) != crypto.KeySize {
+		t.Errorf("Expected key size %d, got %d", crypto.KeySize, len(key1))
+	}
+
+	// Get key should work without prompting
+	key2, err := store.GetKey(account)
+	if err != nil {
+		t.Fatalf("GetKey failed: %v", err)
+	}
+
+	// Keys should be identical
+	if len(key1) != len(key2) {
+		t.Errorf("Key lengths don't match: %d vs %d", len(key1), len(key2))
+	}
+
+	for i := range key1 {
+		if key1[i] != key2[i] {
+			t.Error("Keys don't match")
+			break
+		}
+	}
+}
+
+func TestPasswordKeyStore_EnvironmentVariable(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Set environment variable
+	originalEnv := os.Getenv("ENVX_PASSWORD")
+	defer func() {
+		if originalEnv == "" {
+			os.Unsetenv("ENVX_PASSWORD")
+		} else {
+			os.Setenv("ENVX_PASSWORD", originalEnv)
+		}
+	}()
+
+	os.Setenv("ENVX_PASSWORD", "envvarpassword")
+
+	// Create store without password in config
+	config := &PasswordKeyStoreConfig{
+		Iterations: 1000,
+	}
+
+	store := NewPasswordKeyStore(config).(*PasswordKeyStore)
+
+	// Override salt directory for testing
+	originalGetSaltDir := getSaltDir
+	defer func() { getSaltDir = originalGetSaltDir }()
+	getSaltDir = func() string { return tempDir }
+
+	account := "testaccount"
+
+	// Should use environment variable password
+	key, err := store.CreateKey(account)
+	if err != nil {
+		t.Fatalf("CreateKey failed: %v", err)
+	}
+
+	if len(key) != crypto.KeySize {
+		t.Errorf("Expected key size %d, got %d", crypto.KeySize, len(key))
+	}
+}
+
+func TestPasswordKeyStore_PasswordPriority(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Set environment variable
+	originalEnv := os.Getenv("ENVX_PASSWORD")
+	defer func() {
+		if originalEnv == "" {
+			os.Unsetenv("ENVX_PASSWORD")
+		} else {
+			os.Setenv("ENVX_PASSWORD", originalEnv)
+		}
+	}()
+
+	os.Setenv("ENVX_PASSWORD", "envvarpassword")
+
+	// Create store with password in config
+	config := &PasswordKeyStoreConfig{
+		Iterations: 1000,
+		Password:   "configpassword",
+	}
+
+	store := NewPasswordKeyStore(config).(*PasswordKeyStore)
+
+	// Override salt directory for testing
+	originalGetSaltDir := getSaltDir
+	defer func() { getSaltDir = originalGetSaltDir }()
+	getSaltDir = func() string { return tempDir }
+
+	account := "testaccount"
+
+	// Create key with env var (should take priority)
+	key1, err := store.CreateKey(account)
+	if err != nil {
+		t.Fatalf("CreateKey failed: %v", err)
+	}
+
+	// Unset env var
+	os.Unsetenv("ENVX_PASSWORD")
+
+	// Get key with config password (should work since salt exists)
+	key2, err := store.GetKey(account)
+	if err != nil {
+		t.Fatalf("GetKey failed: %v", err)
+	}
+
+	// Keys should be different because different passwords were used
+	same := true
+	for i := range key1 {
+		if key1[i] != key2[i] {
+			same = false
+			break
+		}
+	}
+
+	if same {
+		t.Error("Keys should be different when using different passwords")
+	}
+}

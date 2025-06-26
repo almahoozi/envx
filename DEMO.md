@@ -11,7 +11,7 @@ This demonstrates the new password-based encryption feature in envx.
 
 ## Usage Examples
 
-### 1. Basic Usage
+### 1. Basic Usage (Interactive)
 
 ```bash
 # Create a .env file with some secrets
@@ -80,6 +80,35 @@ envx run --keystore password docker-compose up
 envx run --keystore password ./scripts/deploy.sh
 ```
 
+### 5. CI/CD and Automated Usage (Non-Interactive)
+
+For CI/CD pipelines and automated systems where interactive password prompts aren't possible:
+
+```bash
+# Method 1: Environment variable (recommended for CI/CD)
+export ENVX_PASSWORD="your_secure_password"
+envx encrypt --keystore password -w
+envx get --keystore password
+envx run --keystore password ./deploy.sh
+
+# Method 2: Command line flag (less secure, visible in process list)
+envx encrypt --keystore password --password "your_password" -w
+envx get --keystore password --password "your_password"
+envx run --keystore password --password "your_password" ./deploy.sh
+
+# Example CI/CD pipeline usage
+# .github/workflows/deploy.yml
+# env:
+#   ENVX_PASSWORD: ${{ secrets.ENVX_PASSWORD }}
+# run: |
+#   envx run --keystore password ./scripts/deploy.sh
+```
+
+**Security Note**: Environment variables are preferred over command-line flags for CI/CD because:
+- Command-line arguments are visible in process lists
+- Environment variables can be securely injected by CI/CD systems
+- No risk of passwords appearing in shell history
+
 ## Cross-Platform Support
 
 ### macOS (Production Ready)
@@ -122,6 +151,9 @@ envx encrypt --keystore password -w
 3. **Use strong passwords**: The security depends on your password strength
 4. **Backup your salt files**: Store `~/.config/envx/salts/` securely for recovery
 5. **Use different passwords per project**: Each directory can have different encryption
+6. **For CI/CD**: Use `ENVX_PASSWORD` environment variable instead of `--password` flag
+7. **Secure CI/CD secrets**: Store passwords in your CI/CD system's secret management
+8. **Rotate passwords regularly**: Especially for production environments
 
 ## Troubleshooting
 
@@ -144,4 +176,11 @@ The password-based keystore:
 2. Stores salt in `~/.config/envx/salts/{account}.salt`
 3. Derives encryption key using PBKDF2(password, salt, 100000, SHA-256)
 4. Uses derived key with AES-GCM for encryption/decryption
-5. Never stores passwords - always prompts when needed 
+5. Never stores passwords - prompts when needed or uses provided password
+
+### Password Resolution Order
+1. **Environment variable**: `ENVX_PASSWORD` (highest priority)
+2. **Command line flag**: `--password` (medium priority)
+3. **Interactive prompt**: Terminal input (lowest priority, fallback)
+
+This allows flexible usage from interactive terminals to fully automated CI/CD pipelines. 

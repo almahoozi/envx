@@ -56,11 +56,16 @@ func loadKey() ([]byte, error) {
 
 // loadKeyWithStringType loads or creates an encryption key using the specified keystore type string
 func loadKeyWithStringType(storeTypeStr string) ([]byte, error) {
+	return loadKeyWithStringTypeAndPassword(storeTypeStr, "")
+}
+
+// loadKeyWithStringTypeAndPassword loads or creates an encryption key using the specified keystore type string and password
+func loadKeyWithStringTypeAndPassword(storeTypeStr, password string) ([]byte, error) {
 	storeType, err := parseKeyStoreType(storeTypeStr)
 	if err != nil {
 		return nil, err
 	}
-	return loadKeyWithType(storeType)
+	return loadKeyWithTypeAndPassword(storeType, password)
 }
 
 // parseKeyStoreType converts a string to KeyStoreType
@@ -79,6 +84,11 @@ func parseKeyStoreType(storeTypeStr string) (KeyStoreType, error) {
 
 // loadKeyWithType loads or creates an encryption key using the specified keystore type
 func loadKeyWithType(storeType KeyStoreType) ([]byte, error) {
+	return loadKeyWithTypeAndPassword(storeType, "")
+}
+
+// loadKeyWithTypeAndPassword loads or creates an encryption key using the specified keystore type and optional password
+func loadKeyWithTypeAndPassword(storeType KeyStoreType, password string) ([]byte, error) {
 	user, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user: %w", err)
@@ -92,7 +102,10 @@ func loadKeyWithType(storeType KeyStoreType) ([]byte, error) {
 		// Use production keystore based on type
 		switch storeType {
 		case KeyStoreTypePassword:
-			store = keystore.NewPasswordKeyStore(nil)
+			config := &keystore.PasswordKeyStoreConfig{
+				Password: password,
+			}
+			store = keystore.NewPasswordKeyStore(config)
 		case KeyStoreTypeMock:
 			store = keystore.NewMockKeyStore()
 		case KeyStoreTypeMacOS:
