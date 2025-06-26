@@ -15,11 +15,11 @@
 - [ ] Fallback to Keychain when Secure Enclave unavailable
 
 ### Password-Based Encryption
-- [ ] Implement password-based key derivation (PBKDF2/Argon2)
-- [ ] Password prompt for encryption/decryption operations
-- [ ] No password storage - request on each operation
-- [ ] Cross-platform support (works on Linux/Windows/macOS)
-- [ ] Configurable key derivation parameters
+- [x] Implement password-based key derivation (PBKDF2/Argon2)
+- [x] Password prompt for encryption/decryption operations
+- [x] No password storage - request on each operation
+- [x] Cross-platform support (works on Linux/Windows/macOS)
+- [x] Configurable key derivation parameters
 
 ## Priority 2: Shell Integration
 
