@@ -49,6 +49,12 @@ const (
 	KeyStoreTypeMock     KeyStoreType = "mock"
 )
 
+// avoid unused lint errors
+var (
+	_ = loadKey
+	_ = loadKeyWithStringType
+)
+
 // loadKey loads or creates an encryption key using the default keystore
 func loadKey() ([]byte, error) {
 	return loadKeyWithType(KeyStoreTypeMacOS)
@@ -61,6 +67,17 @@ func loadKeyWithStringType(storeTypeStr string) ([]byte, error) {
 
 // loadKeyWithStringTypeAndPassword loads or creates an encryption key using the specified keystore type string and password
 func loadKeyWithStringTypeAndPassword(storeTypeStr, password string) ([]byte, error) {
+	// As a workaround we set the password to byte(1) if it is empty using -P
+	if password == emptyPassword {
+		storeTypeStr = "password"
+		password = ""
+	}
+
+	// Auto-detect password keystore if password is provided or ENVX_PASSWORD is set
+	if password != "" || os.Getenv("ENVX_PASSWORD") != "" {
+		storeTypeStr = "password"
+	}
+
 	storeType, err := parseKeyStoreType(storeTypeStr)
 	if err != nil {
 		return nil, err

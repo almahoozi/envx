@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"crypto/pbkdf2"
+
 	"github.com/almahoozi/envx/pkg/crypto"
-	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/term"
 )
 
@@ -69,7 +70,11 @@ func (p *PasswordKeyStore) GetKey(account string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get salt: %w", err)
 	}
 
-	key := pbkdf2.Key([]byte(password), salt, p.iterations, crypto.KeySize, sha256.New)
+	key, err := pbkdf2.Key(sha256.New, password, salt, p.iterations, crypto.KeySize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive key: %w", err)
+	}
+
 	return key, nil
 }
 
@@ -99,19 +104,11 @@ func (p *PasswordKeyStore) CreateKey(account string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
 
-	// Only confirm password if we're prompting interactively
-	if p.password == "" && os.Getenv("ENVX_PASSWORD") == "" {
-		confirmPassword, err := p.promptFunc(fmt.Sprintf("Confirm password for %s", account))
-		if err != nil {
-			return nil, fmt.Errorf("failed to confirm password: %w", err)
-		}
-
-		if password != confirmPassword {
-			return nil, fmt.Errorf("passwords do not match")
-		}
+	key, err := pbkdf2.Key(sha256.New, password, salt, p.iterations, crypto.KeySize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive key: %w", err)
 	}
 
-	key := pbkdf2.Key([]byte(password), salt, p.iterations, crypto.KeySize, sha256.New)
 	return key, nil
 }
 
@@ -124,8 +121,15 @@ func (p *PasswordKeyStore) LoadOrCreateKey(account string) ([]byte, error) {
 		return p.GetKey(account)
 	}
 
-	// Salt doesn't exist, create new one
-	return p.CreateKey(account)
+	// Check if the error is specifically because the file doesn't exist
+	saltFile := p.getSaltFilePath(account)
+	if _, statErr := os.Stat(saltFile); os.IsNotExist(statErr) {
+		// Salt file doesn't exist, create new one
+		return p.CreateKey(account)
+	}
+
+	// Salt file exists but there was another error reading it - don't overwrite
+	return nil, fmt.Errorf("salt file exists but cannot be read: %w", err)
 }
 
 // getSalt retrieves the salt for an account from a file

@@ -3,6 +3,7 @@ package keystore
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/almahoozi/envx/pkg/crypto"
@@ -64,51 +65,15 @@ func TestPasswordKeyStore_CreateKey(t *testing.T) {
 		t.Errorf("Expected key size %d, got %d", crypto.KeySize, len(key))
 	}
 
-	// Should have prompted twice (create and confirm)
-	if promptCalls != 2 {
-		t.Errorf("Expected 2 prompt calls, got %d", promptCalls)
+	// Should have prompted once (no confirmation needed)
+	if promptCalls != 1 {
+		t.Errorf("Expected 1 prompt call, got %d", promptCalls)
 	}
 
 	// Check that salt file was created
 	saltFile := filepath.Join(tempDir, account+".salt")
 	if _, err := os.Stat(saltFile); os.IsNotExist(err) {
 		t.Error("Salt file was not created")
-	}
-}
-
-func TestPasswordKeyStore_CreateKey_PasswordMismatch(t *testing.T) {
-	tempDir := t.TempDir()
-
-	// Mock prompt function that returns different passwords
-	promptCalls := 0
-	mockPrompt := func(prompt string) (string, error) {
-		promptCalls++
-		if promptCalls == 1 {
-			return "password1", nil
-		}
-		return "password2", nil
-	}
-
-	config := &PasswordKeyStoreConfig{
-		Iterations: 1000,
-		PromptFunc: mockPrompt,
-	}
-
-	store := NewPasswordKeyStore(config).(*PasswordKeyStore)
-
-	// Override salt directory for testing
-	originalGetSaltDir := getSaltDir
-	defer func() { getSaltDir = originalGetSaltDir }()
-	getSaltDir = func() string { return tempDir }
-
-	_, err := store.CreateKey("testaccount")
-
-	if err == nil {
-		t.Error("Expected error for password mismatch, got nil")
-	}
-
-	if err.Error() != "passwords do not match" {
-		t.Errorf("Expected 'passwords do not match' error, got: %v", err)
 	}
 }
 
@@ -431,5 +396,80 @@ func TestPasswordKeyStore_PasswordPriority(t *testing.T) {
 
 	if same {
 		t.Error("Keys should be different when using different passwords")
+	}
+}
+
+func TestPasswordKeyStore_LoadOrCreateKey_SaltFileProtection(t *testing.T) {
+	tempDir := t.TempDir()
+
+	mockPrompt := func(prompt string) (string, error) {
+		return "testpassword", nil
+	}
+
+	config := &PasswordKeyStoreConfig{
+		Iterations: 1000,
+		PromptFunc: mockPrompt,
+	}
+
+	store := NewPasswordKeyStore(config).(*PasswordKeyStore)
+
+	// Override salt directory for testing
+	originalGetSaltDir := getSaltDir
+	defer func() { getSaltDir = originalGetSaltDir }()
+	getSaltDir = func() string { return tempDir }
+
+	account := "testaccount"
+
+	// First create a salt file
+	_, err := store.CreateKey(account)
+	if err != nil {
+		t.Fatalf("CreateKey failed: %v", err)
+	}
+
+	saltFile := filepath.Join(tempDir, account+".salt")
+
+	// Verify salt file exists
+	originalSalt, err := os.ReadFile(saltFile)
+	if err != nil {
+		t.Fatalf("Failed to read original salt file: %v", err)
+	}
+
+	// Create a corrupted salt file (wrong size) to simulate read error
+	err = os.WriteFile(saltFile, []byte("corrupted"), 0600)
+	if err != nil {
+		t.Fatalf("Failed to write corrupted salt file: %v", err)
+	}
+
+	// LoadOrCreateKey should fail and NOT overwrite the file
+	_, err = store.LoadOrCreateKey(account)
+	if err == nil {
+		t.Error("Expected error when salt file is corrupted, got nil")
+	}
+
+	// Check that error indicates salt file exists but cannot be read
+	expectedErrMsg := "salt file exists but cannot be read"
+	if err != nil && !strings.Contains(err.Error(), expectedErrMsg) {
+		t.Errorf("Expected error message to contain '%s', got: %v", expectedErrMsg, err)
+	}
+
+	// Verify the corrupted file still exists (wasn't overwritten)
+	corruptedContent, err := os.ReadFile(saltFile)
+	if err != nil {
+		t.Fatalf("Failed to read salt file after LoadOrCreateKey: %v", err)
+	}
+
+	if string(corruptedContent) != "corrupted" {
+		t.Error("Salt file was overwritten when it should have been preserved")
+	}
+
+	// Restore original salt and verify LoadOrCreateKey works
+	err = os.WriteFile(saltFile, originalSalt, 0600)
+	if err != nil {
+		t.Fatalf("Failed to restore original salt file: %v", err)
+	}
+
+	_, err = store.LoadOrCreateKey(account)
+	if err != nil {
+		t.Errorf("LoadOrCreateKey failed with valid salt file: %v", err)
 	}
 }

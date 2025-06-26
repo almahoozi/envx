@@ -17,6 +17,8 @@ import (
 // TODO: Add support for subcommand and option autocomplete, as well as env keys
 // Load from JSON into env :shrug:
 
+var emptyPassword = string([]byte{1})
+
 type command[T any] struct {
 	flags *flag.FlagSet
 	fn    func(context.Context, T, ...string) error
@@ -166,7 +168,8 @@ func start() error {
 	runCmd.flags.StringVarP(&runCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	runCmd.flags.StringVarP(&runCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	runCmd.flags.StringVarP(&runCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
-	runCmd.flags.StringVar(&runCmd.val.Password, "password", "", "Password for password-based keystore (use ENVX_PASSWORD env var for better security)")
+	runCmd.flags.StringVarP(&runCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	runCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	runCmd.fn = run
 	cmds[runCmd.flags.Name()] = runCmd
 
@@ -175,7 +178,8 @@ func start() error {
 	encCmd.flags.StringVarP(&encCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	encCmd.flags.StringVarP(&encCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	encCmd.flags.StringVarP(&encCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
-	encCmd.flags.StringVar(&encCmd.val.Password, "password", "", "Password for password-based keystore (use ENVX_PASSWORD env var for better security)")
+	encCmd.flags.StringVarP(&encCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	encCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	encCmd.val.FmtOpts = NewFmtOpts(encCmd.flags)
 	encCmd.flags.BoolVarP(&encCmd.val.Write, "write", "w", false, "Overwrites the file with encrypted values.")
 	encCmd.fn = encryptCmd
@@ -186,7 +190,8 @@ func start() error {
 	decCmd.flags.StringVarP(&decCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	decCmd.flags.StringVarP(&decCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	decCmd.flags.StringVarP(&decCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
-	decCmd.flags.StringVar(&decCmd.val.Password, "password", "", "Password for password-based keystore (use ENVX_PASSWORD env var for better security)")
+	decCmd.flags.StringVarP(&decCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	decCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	decCmd.val.FmtOpts = NewFmtOpts(decCmd.flags)
 	decCmd.flags.BoolVarP(&decCmd.val.Write, "write", "w", false, "Overwrites the file with decrypted values.")
 	decCmd.fn = decryptCmd
@@ -197,7 +202,8 @@ func start() error {
 	addCmd.flags.StringVarP(&addCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	addCmd.flags.StringVarP(&addCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	addCmd.flags.StringVarP(&addCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
-	addCmd.flags.StringVar(&addCmd.val.Password, "password", "", "Password for password-based keystore (use ENVX_PASSWORD env var for better security)")
+	addCmd.flags.StringVarP(&addCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	addCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	addCmd.val.FmtOpts = NewFmtOpts(addCmd.flags)
 	addCmd.flags.BoolVarP(&addCmd.val.print, "print", "p", false, "Prints the output instead of writing to the file.")
 	addCmd.fn = addCmdFn
@@ -208,7 +214,8 @@ func start() error {
 	setCmd.flags.StringVarP(&setCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	setCmd.flags.StringVarP(&setCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	setCmd.flags.StringVarP(&setCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
-	setCmd.flags.StringVar(&setCmd.val.Password, "password", "", "Password for password-based keystore (use ENVX_PASSWORD env var for better security)")
+	setCmd.flags.StringVarP(&setCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	setCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	setCmd.val.FmtOpts = NewFmtOpts(setCmd.flags)
 	setCmd.flags.BoolVarP(&setCmd.val.print, "print", "p", false, "Prints the output instead of writing to the file.")
 	setCmd.fn = setCmdFn
@@ -219,7 +226,8 @@ func start() error {
 	getCmd.flags.StringVarP(&getCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	getCmd.flags.StringVarP(&getCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	getCmd.flags.StringVarP(&getCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
-	getCmd.flags.StringVar(&getCmd.val.Password, "password", "", "Password for password-based keystore (use ENVX_PASSWORD env var for better security)")
+	getCmd.flags.StringVarP(&getCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	getCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	getCmd.flags.BoolVarP(&getCmd.val.ValuesOnly, "vals", "v", false, "Prints only the values without keys. Use getv command instead to set a custom separator. Ignores formatting options.")
 	getCmd.val.FmtOpts = NewFmtOpts(getCmd.flags)
 	getCmd.fn = getCmdFn
@@ -230,7 +238,8 @@ func start() error {
 	getVCmd.flags.StringVarP(&getVCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
 	getVCmd.flags.StringVarP(&getVCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
 	getVCmd.flags.StringVarP(&getVCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
-	getVCmd.flags.StringVar(&getVCmd.val.Password, "password", "", "Password for password-based keystore (use ENVX_PASSWORD env var for better security)")
+	getVCmd.flags.StringVarP(&getVCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
+	getVCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	getVCmd.flags.StringVarP(&getVCmd.val.Separator, "separator", "s", "\n", "Separator for the values (default is new line)")
 	getVCmd.fn = getVCmdFn
 	cmds[getVCmd.flags.Name()] = getVCmd
