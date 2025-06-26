@@ -4,6 +4,7 @@ envx
 .env
 .env.local
 .env.test
+.envx.yaml
 .DS_Store
 
 # Security scan outputs

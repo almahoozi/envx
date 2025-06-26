@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 
+	"github.com/almahoozi/envx/pkg/config"
 	"github.com/almahoozi/envx/pkg/crypto"
 	"github.com/almahoozi/envx/pkg/env"
 	flag "github.com/spf13/pflag"
@@ -148,6 +150,10 @@ type runOpts struct {
 	Args     []string
 }
 
+type configOpts struct {
+	Directory bool
+}
+
 type executor interface {
 	execute(ctx context.Context, args ...string) error
 }
@@ -243,6 +249,13 @@ func start() error {
 	getVCmd.flags.StringVarP(&getVCmd.val.Separator, "separator", "s", "\n", "Separator for the values (default is new line)")
 	getVCmd.fn = getVCmdFn
 	cmds[getVCmd.flags.Name()] = getVCmd
+
+	// Config commands
+	configCmd := new(command[configOpts])
+	configCmd.flags = flag.NewFlagSet("config", flag.ExitOnError)
+	configCmd.flags.BoolVarP(&configCmd.val.Directory, "directory", "d", false, "Operate on directory-level configuration (.envx.yaml)")
+	configCmd.fn = configCmdFn
+	cmds[configCmd.flags.Name()] = configCmd
 
 	cmds[""] = runCmd
 
@@ -755,4 +768,163 @@ func parseKeyValueArgs(args []string) (map[string]string, error) {
 	}
 
 	return result, nil
+}
+
+func configCmdFn(ctx context.Context, opts configOpts, args ...string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("config command requires a subcommand (set, get, list, show, init, reset)")
+	}
+
+	subcommand := args[0]
+	subArgs := args[1:]
+
+	switch subcommand {
+	case "set":
+		return configSetCmd(ctx, opts, subArgs...)
+	case "get":
+		return configGetCmd(ctx, opts, subArgs...)
+	case "list":
+		return configListCmd(ctx, opts, subArgs...)
+	case "show":
+		return configShowCmd(ctx, opts, subArgs...)
+	case "init":
+		return configInitCmd(ctx, opts, subArgs...)
+	case "reset":
+		return configResetCmd(ctx, opts, subArgs...)
+	default:
+		return fmt.Errorf("unknown config subcommand: %s (supported: set, get, list, show, init, reset)", subcommand)
+	}
+}
+
+func configSetCmd(ctx context.Context, opts configOpts, args ...string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("config set requires exactly 2 arguments: key value")
+	}
+
+	key, value := args[0], args[1]
+	manager := config.NewManager()
+
+	if err := manager.Set(key, value, opts.Directory); err != nil {
+		return fmt.Errorf("failed to set config: %w", err)
+	}
+
+	target := "global"
+	if opts.Directory {
+		target = "directory"
+	}
+	fmt.Printf("Set %s config: %s = %s\n", target, key, value)
+	return nil
+}
+
+func configGetCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	if len(args) == 0 {
+		// Get all configuration values
+		report, err := manager.GetReport()
+		if err != nil {
+			return fmt.Errorf("failed to get config: %w", err)
+		}
+
+		fmt.Printf("keystore = %s (from %s)\n", report.Keystore.Value, report.Keystore.Source)
+		fmt.Printf("file = %s (from %s)\n", report.File.Value, report.File.Source)
+		fmt.Printf("format = %s (from %s)\n", report.Format.Value, report.Format.Source)
+		fmt.Printf("key_name = %s (from %s)\n", report.KeyName.Value, report.KeyName.Source)
+		return nil
+	}
+
+	// Get specific key
+	key := args[0]
+	value, source, err := manager.Get(key)
+	if err != nil {
+		return fmt.Errorf("failed to get config: %w", err)
+	}
+
+	fmt.Printf("%s = %s (from %s)\n", key, value, source)
+	return nil
+}
+
+func configListCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	globalPath, dirPath, err := manager.GetConfigPaths()
+	if err != nil {
+		return fmt.Errorf("failed to get config paths: %w", err)
+	}
+
+	globalExists, dirExists, err := manager.ConfigExists()
+	if err != nil {
+		return fmt.Errorf("failed to check config existence: %w", err)
+	}
+
+	fmt.Printf("Configuration files:\n")
+	fmt.Printf("  Global: %s", globalPath)
+	if globalExists {
+		fmt.Printf(" (exists)\n")
+	} else {
+		fmt.Printf(" (not found)\n")
+	}
+
+	fmt.Printf("  Directory: %s", dirPath)
+	if dirExists {
+		fmt.Printf(" (exists)\n")
+	} else {
+		fmt.Printf(" (not found)\n")
+	}
+
+	fmt.Printf("\nEffective configuration:\n")
+	return configGetCmd(ctx, opts, args...)
+}
+
+func configShowCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	report, err := manager.GetReport()
+	if err != nil {
+		return fmt.Errorf("failed to get config report: %w", err)
+	}
+
+	// Output as JSON for structured viewing
+	jsonData, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config report: %w", err)
+	}
+
+	fmt.Println(string(jsonData))
+	return nil
+}
+
+func configInitCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	if err := manager.Init(opts.Directory); err != nil {
+		return fmt.Errorf("failed to init config: %w", err)
+	}
+
+	target := "global"
+	if opts.Directory {
+		target = "directory"
+	}
+	fmt.Printf("Initialized %s configuration (reset to defaults)\n", target)
+	return nil
+}
+
+func configResetCmd(ctx context.Context, opts configOpts, args ...string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("config reset requires exactly 1 argument: key")
+	}
+
+	key := args[0]
+	manager := config.NewManager()
+
+	if err := manager.Reset(key, opts.Directory); err != nil {
+		return fmt.Errorf("failed to reset config: %w", err)
+	}
+
+	target := "global"
+	if opts.Directory {
+		target = "directory"
+	}
+	fmt.Printf("Reset %s config key: %s\n", target, key)
+	return nil
 }
