@@ -94,36 +94,30 @@ func TestLoadKey(t *testing.T) {
 		t.Skip("Cannot get current user, skipping loadKey test")
 	}
 
-	// Use test-specific keychain config to avoid interfering with production
-	testConfig := &keystore.Config{
-		App:     "envx.test",
-		Service: "com.almahoozi.envx.test",
-	}
-
-	// Test loadKeyWithConfig using test config
-	key, err := loadKeyWithConfig(testConfig)
+	// Test loadKeyWithType using mock keystore
+	key, err := loadKeyWithType(KeyStoreTypeMock)
 	if err != nil {
-		t.Errorf("loadKeyWithConfig() unexpected error: %v", err)
+		t.Errorf("loadKeyWithType() unexpected error: %v", err)
 	}
 
 	if len(key) != crypto.KeySize {
-		t.Errorf("loadKeyWithConfig() returned key of size %d, want %d", len(key), crypto.KeySize)
+		t.Errorf("loadKeyWithType() returned key of size %d, want %d", len(key), crypto.KeySize)
 	}
 
-	// Test that calling loadKeyWithConfig again returns the same key
-	key2, err := loadKeyWithConfig(testConfig)
+	// Test that calling loadKeyWithType again returns the same key
+	key2, err := loadKeyWithType(KeyStoreTypeMock)
 	if err != nil {
-		t.Errorf("loadKeyWithConfig() second call unexpected error: %v", err)
+		t.Errorf("loadKeyWithType() second call unexpected error: %v", err)
 	}
 
 	if len(key2) != crypto.KeySize {
-		t.Errorf("loadKeyWithConfig() second call returned key of size %d, want %d", len(key2), crypto.KeySize)
+		t.Errorf("loadKeyWithType() second call returned key of size %d, want %d", len(key2), crypto.KeySize)
 	}
 
 	// Keys should be the same
 	for i, b := range key {
 		if key2[i] != b {
-			t.Errorf("loadKeyWithConfig() returned different key on second call")
+			t.Errorf("loadKeyWithType() returned different key on second call")
 			break
 		}
 	}
