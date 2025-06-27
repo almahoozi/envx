@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 
+	"github.com/almahoozi/envx/pkg/config"
 	"github.com/almahoozi/envx/pkg/crypto"
 	"github.com/almahoozi/envx/pkg/env"
 	flag "github.com/spf13/pflag"
@@ -92,6 +94,7 @@ type encryptOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	FmtOpts  *fmtOpts
 	Write    bool
 }
@@ -101,6 +104,7 @@ type decryptOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	FmtOpts  *fmtOpts
 	Write    bool
 }
@@ -110,6 +114,7 @@ type addOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	FmtOpts  *fmtOpts
 	print    bool
 }
@@ -119,6 +124,7 @@ type setOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	FmtOpts  *fmtOpts
 	print    bool
 }
@@ -128,6 +134,7 @@ type getOpts struct {
 	File       string
 	KeyStore   string
 	Password   string
+	KeyName    string
 	FmtOpts    *fmtOpts
 	ValuesOnly bool
 }
@@ -137,6 +144,7 @@ type getVOpts struct {
 	File      string
 	KeyStore  string
 	Password  string
+	KeyName   string
 	Separator string
 }
 
@@ -145,11 +153,198 @@ type runOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	Args     []string
+}
+
+type configOpts struct {
+	Directory bool
+	Separator string
 }
 
 type executor interface {
 	execute(ctx context.Context, args ...string) error
+}
+
+// applyConfigToRunOpts merges configuration with CLI options for run command
+func applyConfigToRunOpts(opts *runOpts) error {
+	manager := config.NewManager()
+	cfg, err := manager.GetEffectiveConfig()
+	if err != nil {
+		return err
+	}
+
+	// Apply config defaults only if CLI flags weren't explicitly set
+	if opts.File == "" {
+		opts.File = cfg.File
+	}
+	if opts.Name == "" {
+		opts.Name = cfg.Name
+	}
+	if opts.KeyStore == "" {
+		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
+
+	return nil
+}
+
+// applyConfigToGetOpts merges configuration with CLI options for get command
+func applyConfigToGetOpts(opts *getOpts) error {
+	manager := config.NewManager()
+	cfg, err := manager.GetEffectiveConfig()
+	if err != nil {
+		return err
+	}
+
+	// Apply config defaults only if CLI flags weren't explicitly set
+	if opts.File == "" {
+		opts.File = cfg.File
+	}
+	if opts.Name == "" {
+		opts.Name = cfg.Name
+	}
+	if opts.KeyStore == "" {
+		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
+
+	return nil
+}
+
+// applyConfigToGetVOpts merges configuration with CLI options for getv command
+func applyConfigToGetVOpts(opts *getVOpts) error {
+	manager := config.NewManager()
+	cfg, err := manager.GetEffectiveConfig()
+	if err != nil {
+		return err
+	}
+
+	// Apply config defaults only if CLI flags weren't explicitly set
+	if opts.File == "" {
+		opts.File = cfg.File
+	}
+	if opts.Name == "" {
+		opts.Name = cfg.Name
+	}
+	if opts.KeyStore == "" {
+		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
+
+	return nil
+}
+
+// applyConfigToSetOpts merges configuration with CLI options for set command
+func applyConfigToSetOpts(opts *setOpts) error {
+	manager := config.NewManager()
+	cfg, err := manager.GetEffectiveConfig()
+	if err != nil {
+		return err
+	}
+
+	// Apply config defaults only if CLI flags weren't explicitly set
+	if opts.File == "" {
+		opts.File = cfg.File
+	}
+	if opts.Name == "" {
+		opts.Name = cfg.Name
+	}
+	if opts.KeyStore == "" {
+		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
+
+	return nil
+}
+
+// applyConfigToAddOpts merges configuration with CLI options for add command
+func applyConfigToAddOpts(opts *addOpts) error {
+	manager := config.NewManager()
+	cfg, err := manager.GetEffectiveConfig()
+	if err != nil {
+		return err
+	}
+
+	// Apply config defaults only if CLI flags weren't explicitly set
+	if opts.File == "" {
+		opts.File = cfg.File
+	}
+	if opts.Name == "" {
+		opts.Name = cfg.Name
+	}
+	if opts.KeyStore == "" {
+		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
+
+	return nil
+}
+
+// applyConfigToEncryptOpts merges configuration with CLI options for encrypt command
+func applyConfigToEncryptOpts(opts *encryptOpts) error {
+	manager := config.NewManager()
+	cfg, err := manager.GetEffectiveConfig()
+	if err != nil {
+		return err
+	}
+
+	// Apply config defaults only if CLI flags weren't explicitly set
+	if opts.File == "" {
+		opts.File = cfg.File
+	}
+	if opts.Name == "" {
+		opts.Name = cfg.Name
+	}
+	if opts.KeyStore == "" {
+		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
+
+	return nil
+}
+
+// applyConfigToDecryptOpts merges configuration with CLI options for decrypt command
+func applyConfigToDecryptOpts(opts *decryptOpts) error {
+	manager := config.NewManager()
+	cfg, err := manager.GetEffectiveConfig()
+	if err != nil {
+		return err
+	}
+
+	// Apply config defaults only if CLI flags weren't explicitly set
+	if opts.File == "" {
+		opts.File = cfg.File
+	}
+	if opts.Name == "" {
+		opts.Name = cfg.Name
+	}
+	if opts.KeyStore == "" {
+		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
+
+	return nil
+}
+
+// resolveFileWithConfig uses the config system's smart file resolution
+func resolveFileWithConfig(explicitFile, explicitName string) (string, error) {
+	manager := config.NewManager()
+	return manager.ResolveFile(explicitFile, explicitName)
 }
 
 func start() error {
@@ -165,9 +360,9 @@ func start() error {
 
 	runCmd := new(command[runOpts])
 	runCmd.flags = flag.NewFlagSet("run", flag.ExitOnError)
-	runCmd.flags.StringVarP(&runCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	runCmd.flags.StringVarP(&runCmd.val.File, "file", "f", "", "Uses a specific file instead of the default .env")
 	runCmd.flags.StringVarP(&runCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
-	runCmd.flags.StringVarP(&runCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	runCmd.flags.StringVarP(&runCmd.val.KeyStore, "keystore", "k", "", "Keystore type to use (macos, password, mock)")
 	runCmd.flags.StringVarP(&runCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
 	runCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	runCmd.fn = run
@@ -175,9 +370,9 @@ func start() error {
 
 	encCmd := new(command[encryptOpts])
 	encCmd.flags = flag.NewFlagSet("encrypt", flag.ExitOnError)
-	encCmd.flags.StringVarP(&encCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	encCmd.flags.StringVarP(&encCmd.val.File, "file", "f", "", "Uses a specific file instead of the default .env")
 	encCmd.flags.StringVarP(&encCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
-	encCmd.flags.StringVarP(&encCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	encCmd.flags.StringVarP(&encCmd.val.KeyStore, "keystore", "k", "", "Keystore type to use (macos, password, mock)")
 	encCmd.flags.StringVarP(&encCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
 	encCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	encCmd.val.FmtOpts = NewFmtOpts(encCmd.flags)
@@ -187,9 +382,9 @@ func start() error {
 
 	decCmd := new(command[decryptOpts])
 	decCmd.flags = flag.NewFlagSet("decrypt", flag.ExitOnError)
-	decCmd.flags.StringVarP(&decCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	decCmd.flags.StringVarP(&decCmd.val.File, "file", "f", "", "Uses a specific file instead of the default .env")
 	decCmd.flags.StringVarP(&decCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
-	decCmd.flags.StringVarP(&decCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	decCmd.flags.StringVarP(&decCmd.val.KeyStore, "keystore", "k", "", "Keystore type to use (macos, password, mock)")
 	decCmd.flags.StringVarP(&decCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
 	decCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	decCmd.val.FmtOpts = NewFmtOpts(decCmd.flags)
@@ -199,9 +394,9 @@ func start() error {
 
 	addCmd := new(command[addOpts])
 	addCmd.flags = flag.NewFlagSet("add", flag.ExitOnError)
-	addCmd.flags.StringVarP(&addCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	addCmd.flags.StringVarP(&addCmd.val.File, "file", "f", "", "Uses a specific file instead of the default .env")
 	addCmd.flags.StringVarP(&addCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
-	addCmd.flags.StringVarP(&addCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	addCmd.flags.StringVarP(&addCmd.val.KeyStore, "keystore", "k", "", "Keystore type to use (macos, password, mock)")
 	addCmd.flags.StringVarP(&addCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
 	addCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	addCmd.val.FmtOpts = NewFmtOpts(addCmd.flags)
@@ -211,9 +406,9 @@ func start() error {
 
 	setCmd := new(command[setOpts])
 	setCmd.flags = flag.NewFlagSet("set", flag.ExitOnError)
-	setCmd.flags.StringVarP(&setCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	setCmd.flags.StringVarP(&setCmd.val.File, "file", "f", "", "Uses a specific file instead of the default .env")
 	setCmd.flags.StringVarP(&setCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
-	setCmd.flags.StringVarP(&setCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	setCmd.flags.StringVarP(&setCmd.val.KeyStore, "keystore", "k", "", "Keystore type to use (macos, password, mock)")
 	setCmd.flags.StringVarP(&setCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
 	setCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	setCmd.val.FmtOpts = NewFmtOpts(setCmd.flags)
@@ -223,9 +418,9 @@ func start() error {
 
 	getCmd := new(command[getOpts])
 	getCmd.flags = flag.NewFlagSet("get", flag.ExitOnError)
-	getCmd.flags.StringVarP(&getCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	getCmd.flags.StringVarP(&getCmd.val.File, "file", "f", "", "Uses a specific file instead of the default .env")
 	getCmd.flags.StringVarP(&getCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
-	getCmd.flags.StringVarP(&getCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	getCmd.flags.StringVarP(&getCmd.val.KeyStore, "keystore", "k", "", "Keystore type to use (macos, password, mock)")
 	getCmd.flags.StringVarP(&getCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
 	getCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	getCmd.flags.BoolVarP(&getCmd.val.ValuesOnly, "vals", "v", false, "Prints only the values without keys. Use getv command instead to set a custom separator. Ignores formatting options.")
@@ -235,14 +430,22 @@ func start() error {
 
 	getVCmd := new(command[getVOpts])
 	getVCmd.flags = flag.NewFlagSet("getv", flag.ExitOnError)
-	getVCmd.flags.StringVarP(&getVCmd.val.File, "file", "f", ".env", "Uses a specific file instead of the default .env")
+	getVCmd.flags.StringVarP(&getVCmd.val.File, "file", "f", "", "Uses a specific file instead of the default .env")
 	getVCmd.flags.StringVarP(&getVCmd.val.Name, "name", "n", "", "Looks for .env.<name> file instead of .env")
-	getVCmd.flags.StringVarP(&getVCmd.val.KeyStore, "keystore", "k", "macos", "Keystore type to use (macos, password, mock)")
+	getVCmd.flags.StringVarP(&getVCmd.val.KeyStore, "keystore", "k", "", "Keystore type to use (macos, password, mock)")
 	getVCmd.flags.StringVarP(&getVCmd.val.Password, "password", "P", "", "Password for password-based keystore (implies --keystore password; use ENVX_PASSWORD env var for better security)")
 	getVCmd.flags.Lookup("password").NoOptDefVal = emptyPassword
 	getVCmd.flags.StringVarP(&getVCmd.val.Separator, "separator", "s", "\n", "Separator for the values (default is new line)")
 	getVCmd.fn = getVCmdFn
 	cmds[getVCmd.flags.Name()] = getVCmd
+
+	// Config commands
+	configCmd := new(command[configOpts])
+	configCmd.flags = flag.NewFlagSet("config", flag.ExitOnError)
+	configCmd.flags.BoolVarP(&configCmd.val.Directory, "directory", "d", false, "Operate on directory-level configuration (.envx.yaml)")
+	configCmd.flags.StringVarP(&configCmd.val.Separator, "separator", "s", "\n", "Separator for the values (used with getv subcommand, default is new line)")
+	configCmd.fn = configCmdFn
+	cmds[configCmd.flags.Name()] = configCmd
 
 	cmds[""] = runCmd
 
@@ -260,9 +463,22 @@ func start() error {
 }
 
 func getVCmdFn(ctx context.Context, opts getVOpts, args ...string) error {
-	file := env.BuildFilename(opts.File, opts.Name)
+	// Store original CLI values before applying config
+	originalFile := opts.File
+	originalName := opts.Name
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	// Apply configuration defaults
+	if err := applyConfigToGetVOpts(&opts); err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
+	// Use smart file resolution with original CLI values
+	file, err := resolveFileWithConfig(originalFile, originalName)
+	if err != nil {
+		return fmt.Errorf("error resolving file: %w", err)
+	}
+
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -296,8 +512,17 @@ func getVCmdFn(ctx context.Context, opts getVOpts, args ...string) error {
 }
 
 func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
+	// Store original CLI values before applying config
+	originalFile := opts.File
+	originalName := opts.Name
+
+	// Apply configuration defaults
+	if err := applyConfigToGetOpts(&opts); err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
 	if opts.ValuesOnly {
-		return getVCmdFn(ctx, getVOpts{opts.Name, opts.File, opts.KeyStore, opts.Password, "\n"}, args...)
+		return getVCmdFn(ctx, getVOpts{opts.Name, opts.File, opts.KeyStore, opts.Password, opts.KeyName, "\n"}, args...)
 	}
 
 	format, err := opts.FmtOpts.Format()
@@ -308,9 +533,13 @@ func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := env.BuildFilename(opts.File, opts.Name)
+	// Use smart file resolution with original CLI values
+	file, err := resolveFileWithConfig(originalFile, originalName)
+	if err != nil {
+		return fmt.Errorf("error resolving file: %w", err)
+	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -351,6 +580,15 @@ func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
 }
 
 func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
+	// Store original CLI values before applying config
+	originalFile := opts.File
+	originalName := opts.Name
+
+	// Apply configuration defaults
+	if err := applyConfigToSetOpts(&opts); err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
 	format, err := opts.FmtOpts.Format()
 	if err != nil {
 		return fmt.Errorf("error parsing format: %w", err)
@@ -359,9 +597,13 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := env.BuildFilename(opts.File, opts.Name)
+	// Use smart file resolution with original CLI values
+	file, err := resolveFileWithConfig(originalFile, originalName)
+	if err != nil {
+		return fmt.Errorf("error resolving file: %w", err)
+	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -426,6 +668,15 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 }
 
 func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
+	// Store original CLI values before applying config
+	originalFile := opts.File
+	originalName := opts.Name
+
+	// Apply configuration defaults
+	if err := applyConfigToAddOpts(&opts); err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
 	format, err := opts.FmtOpts.Format()
 	if err != nil {
 		return fmt.Errorf("error parsing format: %w", err)
@@ -434,9 +685,13 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := env.BuildFilename(opts.File, opts.Name)
+	// Use smart file resolution with original CLI values
+	file, err := resolveFileWithConfig(originalFile, originalName)
+	if err != nil {
+		return fmt.Errorf("error resolving file: %w", err)
+	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -510,6 +765,15 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 }
 
 func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
+	// Store original CLI values before applying config
+	originalFile := opts.File
+	originalName := opts.Name
+
+	// Apply configuration defaults
+	if err := applyConfigToEncryptOpts(&opts); err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
 	format, err := opts.FmtOpts.Format()
 	if err != nil {
 		return fmt.Errorf("error parsing format: %w", err)
@@ -518,9 +782,13 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := env.BuildFilename(opts.File, opts.Name)
+	// Use smart file resolution with original CLI values
+	file, err := resolveFileWithConfig(originalFile, originalName)
+	if err != nil {
+		return fmt.Errorf("error resolving file: %w", err)
+	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -577,6 +845,15 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 }
 
 func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
+	// Store original CLI values before applying config
+	originalFile := opts.File
+	originalName := opts.Name
+
+	// Apply configuration defaults
+	if err := applyConfigToDecryptOpts(&opts); err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
 	format, err := opts.FmtOpts.Format()
 	if err != nil {
 		return fmt.Errorf("error parsing format: %w", err)
@@ -585,9 +862,13 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 
-	file := env.BuildFilename(opts.File, opts.Name)
+	// Use smart file resolution with original CLI values
+	file, err := resolveFileWithConfig(originalFile, originalName)
+	if err != nil {
+		return fmt.Errorf("error resolving file: %w", err)
+	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -643,16 +924,29 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 }
 
 func run(ctx context.Context, opts runOpts, args ...string) error {
+	// Store original CLI values before applying config
+	originalFile := opts.File
+	originalName := opts.Name
+
+	// Apply configuration defaults
+	if err := applyConfigToRunOpts(&opts); err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
 	if len(args) < 1 {
 		return fmt.Errorf("missing executable")
 	}
 
 	exe := args[0]
 
-	file := env.BuildFilename(opts.File, opts.Name)
+	// Use smart file resolution with original CLI values
+	file, err := resolveFileWithConfig(originalFile, originalName)
+	if err != nil {
+		return fmt.Errorf("error resolving file: %w", err)
+	}
 
 	// TODO: Move out
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -755,4 +1049,227 @@ func parseKeyValueArgs(args []string) (map[string]string, error) {
 	}
 
 	return result, nil
+}
+
+func configCmdFn(ctx context.Context, opts configOpts, args ...string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("config command requires a subcommand (set, get, getv, list, show, init, reset)")
+	}
+
+	subcommand := args[0]
+	subArgs := args[1:]
+
+	switch subcommand {
+	case "set":
+		return configSetCmd(ctx, opts, subArgs...)
+	case "get":
+		return configGetCmd(ctx, opts, subArgs...)
+	case "getv":
+		return configGetVCmd(ctx, opts, subArgs...)
+	case "list":
+		return configListCmd(ctx, opts, subArgs...)
+	case "show":
+		return configShowCmd(ctx, opts, subArgs...)
+	case "init":
+		return configInitCmd(ctx, opts, subArgs...)
+	case "reset":
+		return configResetCmd(ctx, opts, subArgs...)
+	default:
+		return fmt.Errorf("unknown config subcommand: %s (supported: set, get, getv, list, show, init, reset)", subcommand)
+	}
+}
+
+func configSetCmd(ctx context.Context, opts configOpts, args ...string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("config set requires exactly 2 arguments: key value")
+	}
+
+	key, value := args[0], args[1]
+	manager := config.NewManager()
+
+	if err := manager.Set(key, value, opts.Directory); err != nil {
+		return fmt.Errorf("failed to set config: %w", err)
+	}
+
+	target := "global"
+	if opts.Directory {
+		target = "directory"
+	}
+	fmt.Printf("Set %s config: %s = %s\n", target, key, value)
+	return nil
+}
+
+func configGetCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	if len(args) == 0 {
+		// Get all configuration values
+		report, err := manager.GetReport()
+		if err != nil {
+			return fmt.Errorf("failed to get config: %w", err)
+		}
+
+		fmt.Printf("keystore = %s (from %s)\n", report.Keystore.Value, report.Keystore.Source)
+		fmt.Printf("file = %s (from %s)\n", report.File.Value, report.File.Source)
+		fmt.Printf("name = %s (from %s)\n", report.Name.Value, report.Name.Source)
+		fmt.Printf("format = %s (from %s)\n", report.Format.Value, report.Format.Source)
+		fmt.Printf("key_name = %s (from %s)\n", report.KeyName.Value, report.KeyName.Source)
+		fmt.Printf("file_resolution = %s (from %s)\n", strings.Join(report.FileResolution.Value, ","), report.FileResolution.Source)
+		fmt.Printf("backup_on_write = %s (from %s)\n", report.BackupOnWrite.Value, report.BackupOnWrite.Source)
+		return nil
+	}
+
+	// Get specific key
+	key := args[0]
+
+	// Check if it's an array field
+	if strings.ToLower(key) == "file_resolution" || strings.ToLower(key) == "fileresolution" {
+		values, source, err := manager.GetArray(key)
+		if err != nil {
+			return fmt.Errorf("failed to get config: %w", err)
+		}
+		fmt.Printf("%s = %s (from %s)\n", key, strings.Join(values, ","), source)
+		return nil
+	}
+
+	// Regular string field
+	value, source, err := manager.Get(key)
+	if err != nil {
+		return fmt.Errorf("failed to get config: %w", err)
+	}
+
+	fmt.Printf("%s = %s (from %s)\n", key, value, source)
+	return nil
+}
+
+func configListCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	globalPath, dirPath, err := manager.GetConfigPaths()
+	if err != nil {
+		return fmt.Errorf("failed to get config paths: %w", err)
+	}
+
+	globalExists, dirExists, err := manager.ConfigExists()
+	if err != nil {
+		return fmt.Errorf("failed to check config existence: %w", err)
+	}
+
+	fmt.Printf("Configuration files:\n")
+	fmt.Printf("  Global: %s", globalPath)
+	if globalExists {
+		fmt.Printf(" (exists)\n")
+	} else {
+		fmt.Printf(" (not found)\n")
+	}
+
+	fmt.Printf("  Directory: %s", dirPath)
+	if dirExists {
+		fmt.Printf(" (exists)\n")
+	} else {
+		fmt.Printf(" (not found)\n")
+	}
+
+	fmt.Printf("\nEffective configuration:\n")
+	return configGetCmd(ctx, opts, args...)
+}
+
+func configShowCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	report, err := manager.GetReport()
+	if err != nil {
+		return fmt.Errorf("failed to get config report: %w", err)
+	}
+
+	// Output as JSON for structured viewing
+	jsonData, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config report: %w", err)
+	}
+
+	fmt.Println(string(jsonData))
+	return nil
+}
+
+func configInitCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	if err := manager.Init(opts.Directory); err != nil {
+		return fmt.Errorf("failed to init config: %w", err)
+	}
+
+	target := "global"
+	if opts.Directory {
+		target = "directory"
+	}
+	fmt.Printf("Initialized %s configuration (reset to defaults)\n", target)
+	return nil
+}
+
+func configResetCmd(ctx context.Context, opts configOpts, args ...string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("config reset requires exactly 1 argument: key")
+	}
+
+	key := args[0]
+	manager := config.NewManager()
+
+	if err := manager.Reset(key, opts.Directory); err != nil {
+		return fmt.Errorf("failed to reset config: %w", err)
+	}
+
+	target := "global"
+	if opts.Directory {
+		target = "directory"
+	}
+	fmt.Printf("Reset %s config key: %s\n", target, key)
+	return nil
+}
+
+func configGetVCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	if len(args) == 0 {
+		// Get all configuration values
+		report, err := manager.GetReport()
+		if err != nil {
+			return fmt.Errorf("failed to get config: %w", err)
+		}
+
+		values := []string{
+			report.Keystore.Value,
+			report.File.Value,
+			report.Name.Value,
+			report.Format.Value,
+			report.KeyName.Value,
+			strings.Join(report.FileResolution.Value, ","),
+			report.BackupOnWrite.Value,
+		}
+		fmt.Println(strings.Join(values, opts.Separator))
+		return nil
+	}
+
+	// Get specific key values
+	values := make([]string, 0, len(args))
+	for _, key := range args {
+		// Check if it's an array field
+		if strings.ToLower(key) == "file_resolution" || strings.ToLower(key) == "fileresolution" {
+			arrayValues, _, err := manager.GetArray(key)
+			if err != nil {
+				return fmt.Errorf("failed to get config: %w", err)
+			}
+			values = append(values, strings.Join(arrayValues, ","))
+		} else {
+			// Regular string field
+			value, _, err := manager.Get(key)
+			if err != nil {
+				return fmt.Errorf("failed to get config: %w", err)
+			}
+			values = append(values, value)
+		}
+	}
+
+	fmt.Println(strings.Join(values, opts.Separator))
+	return nil
 }

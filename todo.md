@@ -32,6 +32,12 @@
 - [ ] Allow listing all configs, inluding whether or not the config is a default or override
 - [ ] Allow a directory level config override; global config sits in the XDG but if there is
 a relevant file in the current dir it merges on top of that
+- [ ] Allow setting directory/root specific configs in the global configuration; i.e. profiles;
+when we are in the following directory, use the following overrides. These get merged with
+globals, before the actual directory config file
+- [ ] Allow including other config files (composition)
+- [ ] Allow specifying root config file for use when testing (ex: config.test.yml)
+- [ ] envx config reset without args should reset the full config (with prompt to confirm or -y to force yes)
 
 ### Auto-completion
 - [ ] Command and option completion for bash/zsh/fish
