@@ -152,6 +152,7 @@ type runOpts struct {
 
 type configOpts struct {
 	Directory bool
+	Separator string
 }
 
 type executor interface {
@@ -254,6 +255,7 @@ func start() error {
 	configCmd := new(command[configOpts])
 	configCmd.flags = flag.NewFlagSet("config", flag.ExitOnError)
 	configCmd.flags.BoolVarP(&configCmd.val.Directory, "directory", "d", false, "Operate on directory-level configuration (.envx.yaml)")
+	configCmd.flags.StringVarP(&configCmd.val.Separator, "separator", "s", "\n", "Separator for the values (used with getv subcommand, default is new line)")
 	configCmd.fn = configCmdFn
 	cmds[configCmd.flags.Name()] = configCmd
 
@@ -965,7 +967,7 @@ func configGetVCmd(ctx context.Context, opts configOpts, args ...string) error {
 			strings.Join(report.FileResolution.Value, ","),
 			report.BackupOnWrite.Value,
 		}
-		fmt.Println(strings.Join(values, "\n"))
+		fmt.Println(strings.Join(values, opts.Separator))
 		return nil
 	}
 
@@ -989,6 +991,6 @@ func configGetVCmd(ctx context.Context, opts configOpts, args ...string) error {
 		}
 	}
 
-	fmt.Println(strings.Join(values, "\n"))
+	fmt.Println(strings.Join(values, opts.Separator))
 	return nil
 }
