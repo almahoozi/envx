@@ -348,7 +348,6 @@ func TestManagerNewFields(t *testing.T) {
 }
 
 func TestResolveFile(t *testing.T) {
-	// Create temporary directory for testing
 	tempDir := t.TempDir()
 	originalWd, _ := os.Getwd()
 	os.Chdir(tempDir)
@@ -361,69 +360,119 @@ func TestResolveFile(t *testing.T) {
 
 	manager := NewManager()
 
-	// Create some test files
-	os.WriteFile(".env.local", []byte("TEST=local"), 0644)
-	os.WriteFile(".env", []byte("TEST=default"), 0644)
+	// Set up test configuration
+	err := manager.Set("name", "local", false)
+	if err != nil {
+		t.Fatalf("Failed to set config: %v", err)
+	}
 
 	tests := []struct {
 		name         string
 		explicitFile string
 		explicitName string
-		configName   string
-		fileRes      []string
+		createFiles  []string
 		expected     string
 	}{
 		{
 			name:         "explicit file takes precedence",
 			explicitFile: "custom.env",
 			explicitName: "",
+			createFiles:  []string{"custom.env"},
 			expected:     "custom.env",
 		},
 		{
 			name:         "explicit file with name",
 			explicitFile: "custom.env",
 			explicitName: "test",
-			expected:     "custom.test.env",
+			createFiles:  []string{"custom.env.test"},
+			expected:     "custom.env.test",
 		},
 		{
 			name:         "explicit name with default file",
 			explicitFile: "",
 			explicitName: "test",
-			expected:     ".test.env",
+			createFiles:  []string{".env.test"},
+			expected:     ".env.test",
 		},
 		{
-			name:       "configured name",
-			configName: "local",
-			expected:   ".local.env",
+			name:         "configured name",
+			explicitFile: "",
+			explicitName: "",
+			createFiles:  []string{".env.local"},
+			expected:     ".env.local",
 		},
 		{
-			name:     "file resolution - first existing",
-			fileRes:  []string{".env.nonexistent", ".env.local", ".env"},
-			expected: ".env.local",
+			name:         "file_resolution - first existing",
+			explicitFile: "",
+			explicitName: "",
+			createFiles:  []string{".env.local", ".env.dev"},
+			expected:     ".env.local",
 		},
 		{
-			name:     "file resolution - fallback to second",
-			fileRes:  []string{".env.nonexistent", ".env"},
-			expected: ".env",
+			name:         "file_resolution - fallback to second",
+			explicitFile: "",
+			explicitName: "",
+			createFiles:  []string{".env.dev"},
+			expected:     ".env.dev",
 		},
 		{
-			name:     "no existing files, use default",
-			fileRes:  []string{".env.nonexistent"},
-			expected: ".env",
+			name:         "no existing files, use default",
+			explicitFile: "",
+			explicitName: "",
+			createFiles:  []string{},
+			expected:     ".env",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset config
-			manager.Init(false)
+			// Clean up any existing files
+			os.RemoveAll(tempDir)
+			os.MkdirAll(tempDir, 0755)
+			os.Chdir(tempDir)
 
-			// Set up config for this test
-			if tt.configName != "" {
-				manager.Set("name", tt.configName, false)
+			// Set up file_resolution for tests that need it
+			if tt.name == "file_resolution - first existing" || tt.name == "file_resolution - fallback to second" {
+				// Reset name to empty for file_resolution tests
+				err := manager.Set("name", "", false)
+				if err != nil {
+					t.Fatalf("Failed to reset name: %v", err)
+				}
+				err = manager.Set("file_resolution", ".env.local,.env.dev,.env", false)
+				if err != nil {
+					t.Fatalf("Failed to set file_resolution: %v", err)
+				}
+			} else if tt.name == "no existing files, use default" {
+				// Reset name and file_resolution for default test
+				err := manager.Set("name", "", false)
+				if err != nil {
+					t.Fatalf("Failed to reset name: %v", err)
+				}
+				err = manager.Set("file_resolution", "", false)
+				if err != nil {
+					t.Fatalf("Failed to reset file_resolution: %v", err)
+				}
+			} else {
+				// Reset file_resolution for other tests
+				err := manager.Set("file_resolution", "", false)
+				if err != nil {
+					t.Fatalf("Failed to reset file_resolution: %v", err)
+				}
+				// Set name back to local for configured name test
+				if tt.name == "configured name" {
+					err := manager.Set("name", "local", false)
+					if err != nil {
+						t.Fatalf("Failed to set name: %v", err)
+					}
+				}
 			}
-			if len(tt.fileRes) > 0 {
-				manager.Set("file_resolution", strings.Join(tt.fileRes, ","), false)
+
+			// Create test files
+			for _, file := range tt.createFiles {
+				err := os.WriteFile(file, []byte("test"), 0644)
+				if err != nil {
+					t.Fatalf("Failed to create test file %s: %v", file, err)
+				}
 			}
 
 			result, err := manager.ResolveFile(tt.explicitFile, tt.explicitName)
@@ -445,10 +494,11 @@ func TestBuildFilename(t *testing.T) {
 		expected string
 	}{
 		{".env", "", ".env"},
-		{".env", "local", ".local.env"},
-		{".env", "test", ".test.env"},
-		{"config", "prod", "config.prod"},
-		{"app.config", "dev", "app.dev.config"},
+		{".env", "local", ".env.local"},
+		{".env", "test", ".env.test"},
+		{"app.config", "", "app.config"},
+		{"app.config", "dev", "app.config.dev"},
+		{"noext", "suffix", "noext.suffix"},
 	}
 
 	for _, tt := range tests {

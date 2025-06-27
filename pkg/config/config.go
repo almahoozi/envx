@@ -372,12 +372,7 @@ func buildFilename(file, name string) string {
 		return file
 	}
 
-	// Handle extensions properly
-	if strings.Contains(file, ".") {
-		parts := strings.SplitN(file, ".", 2)
-		return parts[0] + "." + name + "." + parts[1]
-	}
-
+	// Use same logic as env.BuildFilename: file.name
 	return file + "." + name
 }
 
