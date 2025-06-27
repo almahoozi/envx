@@ -828,13 +828,27 @@ func configGetCmd(ctx context.Context, opts configOpts, args ...string) error {
 
 		fmt.Printf("keystore = %s (from %s)\n", report.Keystore.Value, report.Keystore.Source)
 		fmt.Printf("file = %s (from %s)\n", report.File.Value, report.File.Source)
+		fmt.Printf("name = %s (from %s)\n", report.Name.Value, report.Name.Source)
 		fmt.Printf("format = %s (from %s)\n", report.Format.Value, report.Format.Source)
 		fmt.Printf("key_name = %s (from %s)\n", report.KeyName.Value, report.KeyName.Source)
+		fmt.Printf("file_resolution = %s (from %s)\n", strings.Join(report.FileResolution.Value, ","), report.FileResolution.Source)
 		return nil
 	}
 
 	// Get specific key
 	key := args[0]
+
+	// Check if it's an array field
+	if strings.ToLower(key) == "file_resolution" || strings.ToLower(key) == "fileresolution" {
+		values, source, err := manager.GetArray(key)
+		if err != nil {
+			return fmt.Errorf("failed to get config: %w", err)
+		}
+		fmt.Printf("%s = %s (from %s)\n", key, strings.Join(values, ","), source)
+		return nil
+	}
+
+	// Regular string field
 	value, source, err := manager.Get(key)
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -15,25 +16,35 @@ func TestDefaultConfig(t *testing.T) {
 	if config.File != ".env" {
 		t.Errorf("Expected default file to be '.env', got '%s'", config.File)
 	}
+	if config.Name != "" {
+		t.Errorf("Expected default name to be empty, got '%s'", config.Name)
+	}
 	if config.Format != "env" {
 		t.Errorf("Expected default format to be 'env', got '%s'", config.Format)
 	}
 	if config.KeyName != "default" {
 		t.Errorf("Expected default key_name to be 'default', got '%s'", config.KeyName)
 	}
+	if len(config.FileResolution) != 1 || config.FileResolution[0] != ".env" {
+		t.Errorf("Expected default file_resolution to be ['.env'], got %v", config.FileResolution)
+	}
 }
 
 func TestConfigMerge(t *testing.T) {
 	base := &Config{
-		Keystore: "macos",
-		File:     ".env",
-		Format:   "env",
-		KeyName:  "default",
+		Keystore:       "macos",
+		File:           ".env",
+		Name:           "",
+		Format:         "env",
+		KeyName:        "default",
+		FileResolution: []string{".env"},
 	}
 
 	override := &Config{
-		Keystore: "password",
-		Format:   "json",
+		Keystore:       "password",
+		Format:         "json",
+		Name:           "local",
+		FileResolution: []string{".env.local", ".env"},
 		// File and KeyName are empty, should not override
 	}
 
@@ -45,11 +56,17 @@ func TestConfigMerge(t *testing.T) {
 	if base.Format != "json" {
 		t.Errorf("Expected format to be overridden to 'json', got '%s'", base.Format)
 	}
+	if base.Name != "local" {
+		t.Errorf("Expected name to be overridden to 'local', got '%s'", base.Name)
+	}
 	if base.File != ".env" {
 		t.Errorf("Expected file to remain '.env', got '%s'", base.File)
 	}
 	if base.KeyName != "default" {
 		t.Errorf("Expected key_name to remain 'default', got '%s'", base.KeyName)
+	}
+	if len(base.FileResolution) != 2 || base.FileResolution[0] != ".env.local" {
+		t.Errorf("Expected file_resolution to be overridden to ['.env.local', '.env'], got %v", base.FileResolution)
 	}
 }
 
@@ -267,5 +284,187 @@ func TestInvalidConfigKey(t *testing.T) {
 	_, _, err = manager.Get("invalid_key")
 	if err == nil {
 		t.Error("Expected error when getting invalid config key")
+	}
+}
+
+func TestManagerNewFields(t *testing.T) {
+	// Create temporary directory for testing
+	tempDir := t.TempDir()
+	originalWd, _ := os.Getwd()
+	os.Chdir(tempDir)
+	defer os.Chdir(originalWd)
+
+	// Override config directory for testing
+	tempConfigDir := filepath.Join(tempDir, "config")
+	os.Setenv("ENVX_CONFIG_DIR", tempConfigDir)
+	defer os.Unsetenv("ENVX_CONFIG_DIR")
+
+	manager := NewManager()
+
+	// Test setting name
+	err := manager.Set("name", "local", false)
+	if err != nil {
+		t.Fatalf("Failed to set name config: %v", err)
+	}
+
+	value, source, err := manager.Get("name")
+	if err != nil {
+		t.Fatalf("Failed to get name config: %v", err)
+	}
+	if value != "local" || source != SourceGlobal {
+		t.Errorf("Expected name 'local' from global, got '%s' from '%s'", value, source)
+	}
+
+	// Test setting file_resolution
+	err = manager.Set("file_resolution", ".env.local,.env,.env.example", false)
+	if err != nil {
+		t.Fatalf("Failed to set file_resolution config: %v", err)
+	}
+
+	values, source, err := manager.GetArray("file_resolution")
+	if err != nil {
+		t.Fatalf("Failed to get file_resolution config: %v", err)
+	}
+	expected := []string{".env.local", ".env", ".env.example"}
+	if len(values) != len(expected) {
+		t.Errorf("Expected file_resolution length %d, got %d", len(expected), len(values))
+	}
+	for i, v := range values {
+		if v != expected[i] {
+			t.Errorf("Expected file_resolution[%d] to be '%s', got '%s'", i, expected[i], v)
+		}
+	}
+	if source != SourceGlobal {
+		t.Errorf("Expected source to be global, got '%s'", source)
+	}
+}
+
+func TestResolveFile(t *testing.T) {
+	// Create temporary directory for testing
+	tempDir := t.TempDir()
+	originalWd, _ := os.Getwd()
+	os.Chdir(tempDir)
+	defer os.Chdir(originalWd)
+
+	// Override config directory for testing
+	tempConfigDir := filepath.Join(tempDir, "config")
+	os.Setenv("ENVX_CONFIG_DIR", tempConfigDir)
+	defer os.Unsetenv("ENVX_CONFIG_DIR")
+
+	manager := NewManager()
+
+	// Create some test files
+	os.WriteFile(".env.local", []byte("TEST=local"), 0644)
+	os.WriteFile(".env", []byte("TEST=default"), 0644)
+
+	tests := []struct {
+		name         string
+		explicitFile string
+		explicitName string
+		configName   string
+		fileRes      []string
+		expected     string
+	}{
+		{
+			name:         "explicit file takes precedence",
+			explicitFile: "custom.env",
+			explicitName: "",
+			expected:     "custom.env",
+		},
+		{
+			name:         "explicit file with name",
+			explicitFile: "custom.env",
+			explicitName: "test",
+			expected:     "custom.test.env",
+		},
+		{
+			name:         "explicit name with default file",
+			explicitFile: "",
+			explicitName: "test",
+			expected:     ".test.env",
+		},
+		{
+			name:       "configured name",
+			configName: "local",
+			expected:   ".local.env",
+		},
+		{
+			name:     "file resolution - first existing",
+			fileRes:  []string{".env.nonexistent", ".env.local", ".env"},
+			expected: ".env.local",
+		},
+		{
+			name:     "file resolution - fallback to second",
+			fileRes:  []string{".env.nonexistent", ".env"},
+			expected: ".env",
+		},
+		{
+			name:     "no existing files, use default",
+			fileRes:  []string{".env.nonexistent"},
+			expected: ".env",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset config
+			manager.Init(false)
+
+			// Set up config for this test
+			if tt.configName != "" {
+				manager.Set("name", tt.configName, false)
+			}
+			if len(tt.fileRes) > 0 {
+				manager.Set("file_resolution", strings.Join(tt.fileRes, ","), false)
+			}
+
+			result, err := manager.ResolveFile(tt.explicitFile, tt.explicitName)
+			if err != nil {
+				t.Fatalf("ResolveFile failed: %v", err)
+			}
+
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestBuildFilename(t *testing.T) {
+	tests := []struct {
+		file     string
+		name     string
+		expected string
+	}{
+		{".env", "", ".env"},
+		{".env", "local", ".local.env"},
+		{".env", "test", ".test.env"},
+		{"config", "prod", "config.prod"},
+		{"app.config", "dev", "app.dev.config"},
+	}
+
+	for _, tt := range tests {
+		result := buildFilename(tt.file, tt.name)
+		if result != tt.expected {
+			t.Errorf("buildFilename(%s, %s) = %s, expected %s", tt.file, tt.name, result, tt.expected)
+		}
+	}
+}
+
+func TestEnvConfigDirOverride(t *testing.T) {
+	// Set custom config directory
+	customDir := "/tmp/envx-test-config"
+	os.Setenv("ENVX_CONFIG_DIR", customDir)
+	defer os.Unsetenv("ENVX_CONFIG_DIR")
+
+	loader := NewLoader()
+	path, err := loader.GetGlobalConfigPath()
+	if err != nil {
+		t.Fatalf("Failed to get config path: %v", err)
+	}
+
+	expected := filepath.Join(customDir, "config.yaml")
+	if path != expected {
+		t.Errorf("Expected config path '%s', got '%s'", expected, path)
 	}
 }

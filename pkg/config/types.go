@@ -2,19 +2,23 @@ package config
 
 // Config represents the envx configuration
 type Config struct {
-	Keystore string `yaml:"keystore,omitempty"`
-	File     string `yaml:"file,omitempty"`
-	Format   string `yaml:"format,omitempty"`
-	KeyName  string `yaml:"key_name,omitempty"`
+	Keystore       string   `yaml:"keystore,omitempty"`
+	File           string   `yaml:"file,omitempty"`
+	Name           string   `yaml:"name,omitempty"`
+	Format         string   `yaml:"format,omitempty"`
+	KeyName        string   `yaml:"key_name,omitempty"`
+	FileResolution []string `yaml:"file_resolution,omitempty"`
 }
 
 // DefaultConfig returns the default configuration values
 func DefaultConfig() *Config {
 	return &Config{
-		Keystore: "macos",
-		File:     ".env",
-		Format:   "env",
-		KeyName:  "default",
+		Keystore:       "macos",
+		File:           ".env",
+		Name:           "",
+		Format:         "env",
+		KeyName:        "default",
+		FileResolution: []string{".env"},
 	}
 }
 
@@ -27,11 +31,17 @@ func (c *Config) Merge(other *Config) {
 	if other.File != "" {
 		c.File = other.File
 	}
+	if other.Name != "" {
+		c.Name = other.Name
+	}
 	if other.Format != "" {
 		c.Format = other.Format
 	}
 	if other.KeyName != "" {
 		c.KeyName = other.KeyName
+	}
+	if len(other.FileResolution) > 0 {
+		c.FileResolution = other.FileResolution
 	}
 }
 
@@ -52,10 +62,18 @@ type ConfigValue struct {
 	Source ConfigSource `json:"source"`
 }
 
+// ConfigArrayValue represents a configuration array value with its source
+type ConfigArrayValue struct {
+	Value  []string     `json:"value"`
+	Source ConfigSource `json:"source"`
+}
+
 // ConfigReport represents the effective configuration with sources
 type ConfigReport struct {
-	Keystore ConfigValue `json:"keystore"`
-	File     ConfigValue `json:"file"`
-	Format   ConfigValue `json:"format"`
-	KeyName  ConfigValue `json:"key_name"`
+	Keystore       ConfigValue      `json:"keystore"`
+	File           ConfigValue      `json:"file"`
+	Name           ConfigValue      `json:"name"`
+	Format         ConfigValue      `json:"format"`
+	KeyName        ConfigValue      `json:"key_name"`
+	FileResolution ConfigArrayValue `json:"file_resolution"`
 }

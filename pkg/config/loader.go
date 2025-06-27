@@ -63,12 +63,21 @@ func (l *Loader) LoadDirectoryConfig() (*Config, error) {
 
 // GetGlobalConfigPath returns the path to the global configuration file
 func (l *Loader) GetGlobalConfigPath() (string, error) {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get user config directory: %w", err)
+	var configDir string
+	var err error
+
+	// Check for override environment variable first (for testing safety)
+	if envConfigDir := os.Getenv("ENVX_CONFIG_DIR"); envConfigDir != "" {
+		configDir = envConfigDir
+	} else {
+		configDir, err = os.UserConfigDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get user config directory: %w", err)
+		}
+		configDir = filepath.Join(configDir, "envx")
 	}
 
-	return filepath.Join(configDir, "envx", "config.yaml"), nil
+	return filepath.Join(configDir, "config.yaml"), nil
 }
 
 // GetDirectoryConfigPath returns the path to the directory-specific configuration file
