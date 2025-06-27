@@ -772,7 +772,7 @@ func parseKeyValueArgs(args []string) (map[string]string, error) {
 
 func configCmdFn(ctx context.Context, opts configOpts, args ...string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("config command requires a subcommand (set, get, list, show, init, reset)")
+		return fmt.Errorf("config command requires a subcommand (set, get, getv, list, show, init, reset)")
 	}
 
 	subcommand := args[0]
@@ -783,6 +783,8 @@ func configCmdFn(ctx context.Context, opts configOpts, args ...string) error {
 		return configSetCmd(ctx, opts, subArgs...)
 	case "get":
 		return configGetCmd(ctx, opts, subArgs...)
+	case "getv":
+		return configGetVCmd(ctx, opts, subArgs...)
 	case "list":
 		return configListCmd(ctx, opts, subArgs...)
 	case "show":
@@ -792,7 +794,7 @@ func configCmdFn(ctx context.Context, opts configOpts, args ...string) error {
 	case "reset":
 		return configResetCmd(ctx, opts, subArgs...)
 	default:
-		return fmt.Errorf("unknown config subcommand: %s (supported: set, get, list, show, init, reset)", subcommand)
+		return fmt.Errorf("unknown config subcommand: %s (supported: set, get, getv, list, show, init, reset)", subcommand)
 	}
 }
 
@@ -832,6 +834,7 @@ func configGetCmd(ctx context.Context, opts configOpts, args ...string) error {
 		fmt.Printf("format = %s (from %s)\n", report.Format.Value, report.Format.Source)
 		fmt.Printf("key_name = %s (from %s)\n", report.KeyName.Value, report.KeyName.Source)
 		fmt.Printf("file_resolution = %s (from %s)\n", strings.Join(report.FileResolution.Value, ","), report.FileResolution.Source)
+		fmt.Printf("backup_on_write = %s (from %s)\n", report.BackupOnWrite.Value, report.BackupOnWrite.Source)
 		return nil
 	}
 
@@ -940,5 +943,52 @@ func configResetCmd(ctx context.Context, opts configOpts, args ...string) error 
 		target = "directory"
 	}
 	fmt.Printf("Reset %s config key: %s\n", target, key)
+	return nil
+}
+
+func configGetVCmd(ctx context.Context, opts configOpts, args ...string) error {
+	manager := config.NewManager()
+
+	if len(args) == 0 {
+		// Get all configuration values
+		report, err := manager.GetReport()
+		if err != nil {
+			return fmt.Errorf("failed to get config: %w", err)
+		}
+
+		values := []string{
+			report.Keystore.Value,
+			report.File.Value,
+			report.Name.Value,
+			report.Format.Value,
+			report.KeyName.Value,
+			strings.Join(report.FileResolution.Value, ","),
+			report.BackupOnWrite.Value,
+		}
+		fmt.Println(strings.Join(values, "\n"))
+		return nil
+	}
+
+	// Get specific key values
+	values := make([]string, 0, len(args))
+	for _, key := range args {
+		// Check if it's an array field
+		if strings.ToLower(key) == "file_resolution" || strings.ToLower(key) == "fileresolution" {
+			arrayValues, _, err := manager.GetArray(key)
+			if err != nil {
+				return fmt.Errorf("failed to get config: %w", err)
+			}
+			values = append(values, strings.Join(arrayValues, ","))
+		} else {
+			// Regular string field
+			value, _, err := manager.Get(key)
+			if err != nil {
+				return fmt.Errorf("failed to get config: %w", err)
+			}
+			values = append(values, value)
+		}
+	}
+
+	fmt.Println(strings.Join(values, "\n"))
 	return nil
 }

@@ -28,6 +28,9 @@ func TestDefaultConfig(t *testing.T) {
 	if len(config.FileResolution) != 1 || config.FileResolution[0] != ".env" {
 		t.Errorf("Expected default file_resolution to be ['.env'], got %v", config.FileResolution)
 	}
+	if !config.BackupOnWrite {
+		t.Errorf("Expected default backup_on_write to be true, got %v", config.BackupOnWrite)
+	}
 }
 
 func TestConfigMerge(t *testing.T) {
@@ -38,6 +41,7 @@ func TestConfigMerge(t *testing.T) {
 		Format:         "env",
 		KeyName:        "default",
 		FileResolution: []string{".env"},
+		BackupOnWrite:  true,
 	}
 
 	override := &Config{
@@ -45,6 +49,7 @@ func TestConfigMerge(t *testing.T) {
 		Format:         "json",
 		Name:           "local",
 		FileResolution: []string{".env.local", ".env"},
+		BackupOnWrite:  false,
 		// File and KeyName are empty, should not override
 	}
 
@@ -67,6 +72,9 @@ func TestConfigMerge(t *testing.T) {
 	}
 	if len(base.FileResolution) != 2 || base.FileResolution[0] != ".env.local" {
 		t.Errorf("Expected file_resolution to be overridden to ['.env.local', '.env'], got %v", base.FileResolution)
+	}
+	if base.BackupOnWrite != false {
+		t.Errorf("Expected backup_on_write to be overridden to false, got %v", base.BackupOnWrite)
 	}
 }
 
@@ -466,5 +474,141 @@ func TestEnvConfigDirOverride(t *testing.T) {
 	expected := filepath.Join(customDir, "config.yaml")
 	if path != expected {
 		t.Errorf("Expected config path '%s', got '%s'", expected, path)
+	}
+}
+
+func TestBackupOnWrite(t *testing.T) {
+	// Create temporary directory for testing
+	tempDir := t.TempDir()
+	originalWd, _ := os.Getwd()
+	os.Chdir(tempDir)
+	defer os.Chdir(originalWd)
+
+	// Override config directory for testing
+	tempConfigDir := filepath.Join(tempDir, "config")
+	os.Setenv("ENVX_CONFIG_DIR", tempConfigDir)
+	defer os.Unsetenv("ENVX_CONFIG_DIR")
+
+	manager := NewManager()
+
+	// Test setting backup_on_write
+	err := manager.Set("backup_on_write", "false", false)
+	if err != nil {
+		t.Fatalf("Failed to set backup_on_write config: %v", err)
+	}
+
+	value, source, err := manager.Get("backup_on_write")
+	if err != nil {
+		t.Fatalf("Failed to get backup_on_write config: %v", err)
+	}
+	if value != "false" || source != SourceGlobal {
+		t.Errorf("Expected backup_on_write 'false' from global, got '%s' from '%s'", value, source)
+	}
+
+	// Test boolean parsing
+	err = manager.Set("backup_on_write", "true", false)
+	if err != nil {
+		t.Fatalf("Failed to set backup_on_write to true: %v", err)
+	}
+
+	value, _, err = manager.Get("backup_on_write")
+	if err != nil {
+		t.Fatalf("Failed to get backup_on_write config: %v", err)
+	}
+	if value != "true" {
+		t.Errorf("Expected backup_on_write 'true', got '%s'", value)
+	}
+}
+
+func TestCreateBackup(t *testing.T) {
+	// Create temporary directory for testing
+	tempDir := t.TempDir()
+	originalWd, _ := os.Getwd()
+	os.Chdir(tempDir)
+	defer os.Chdir(originalWd)
+
+	// Override config directory for testing
+	tempConfigDir := filepath.Join(tempDir, "config")
+	os.Setenv("ENVX_CONFIG_DIR", tempConfigDir)
+	defer os.Unsetenv("ENVX_CONFIG_DIR")
+
+	manager := NewManager()
+
+	// Create a test file
+	testFile := "test-config.yaml"
+	originalContent := "test: original"
+	err := os.WriteFile(testFile, []byte(originalContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Enable backup
+	err = manager.Set("backup_on_write", "true", false)
+	if err != nil {
+		t.Fatalf("Failed to enable backup: %v", err)
+	}
+
+	// Create backup
+	err = manager.createBackup(testFile)
+	if err != nil {
+		t.Fatalf("Failed to create backup: %v", err)
+	}
+
+	// Check that backup file was created
+	files, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("Failed to read directory: %v", err)
+	}
+
+	backupFound := false
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), "test-config.yaml.backup.") {
+			backupFound = true
+
+			// Verify backup content
+			backupContent, err := os.ReadFile(file.Name())
+			if err != nil {
+				t.Fatalf("Failed to read backup file: %v", err)
+			}
+
+			if string(backupContent) != originalContent {
+				t.Errorf("Backup content doesn't match original. Expected '%s', got '%s'", originalContent, string(backupContent))
+			}
+			break
+		}
+	}
+
+	if !backupFound {
+		t.Error("Backup file was not created")
+	}
+
+	// Test with backup disabled
+	err = manager.Set("backup_on_write", "false", false)
+	if err != nil {
+		t.Fatalf("Failed to disable backup: %v", err)
+	}
+
+	// Try to create backup (should be skipped)
+	testFile2 := "test-config2.yaml"
+	err = os.WriteFile(testFile2, []byte("test: content"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test file 2: %v", err)
+	}
+
+	err = manager.createBackup(testFile2)
+	if err != nil {
+		t.Fatalf("Failed to create backup (should be skipped): %v", err)
+	}
+
+	// Check that no backup was created for testFile2
+	files, err = os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("Failed to read directory: %v", err)
+	}
+
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), "test-config2.yaml.backup.") {
+			t.Error("Backup file was created when backup was disabled")
+		}
 	}
 }

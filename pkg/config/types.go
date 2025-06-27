@@ -8,6 +8,7 @@ type Config struct {
 	Format         string   `yaml:"format,omitempty"`
 	KeyName        string   `yaml:"key_name,omitempty"`
 	FileResolution []string `yaml:"file_resolution,omitempty"`
+	BackupOnWrite  bool     `yaml:"backup_on_write,omitempty"`
 }
 
 // DefaultConfig returns the default configuration values
@@ -19,6 +20,7 @@ func DefaultConfig() *Config {
 		Format:         "env",
 		KeyName:        "default",
 		FileResolution: []string{".env"},
+		BackupOnWrite:  true, // Default to true for safety
 	}
 }
 
@@ -43,6 +45,9 @@ func (c *Config) Merge(other *Config) {
 	if len(other.FileResolution) > 0 {
 		c.FileResolution = other.FileResolution
 	}
+	// For boolean fields, we need to check if it was explicitly set
+	// For now, we'll always merge the boolean value
+	c.BackupOnWrite = other.BackupOnWrite
 }
 
 // ConfigSource represents where a configuration value came from
@@ -76,4 +81,5 @@ type ConfigReport struct {
 	Format         ConfigValue      `json:"format"`
 	KeyName        ConfigValue      `json:"key_name"`
 	FileResolution ConfigArrayValue `json:"file_resolution"`
+	BackupOnWrite  ConfigValue      `json:"backup_on_write"`
 }

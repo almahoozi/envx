@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -131,6 +132,11 @@ func (l *Loader) SaveDirectoryConfig(config *Config) error {
 
 // saveConfigToFile saves configuration to a specific file
 func (l *Loader) saveConfigToFile(path string, config *Config) error {
+	// Create backup if backup is enabled and file exists
+	if err := l.createBackupIfEnabled(path, config); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -144,6 +150,35 @@ func (l *Loader) saveConfigToFile(path string, config *Config) error {
 
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file %s: %w", path, err)
+	}
+
+	return nil
+}
+
+// createBackupIfEnabled creates a backup if the BackupOnWrite setting is enabled
+func (l *Loader) createBackupIfEnabled(filePath string, config *Config) error {
+	// Check if backup is enabled in the config being saved
+	if !config.BackupOnWrite {
+		return nil // Backup disabled
+	}
+
+	// Check if original file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return nil // No file to backup
+	}
+
+	// Create backup filename with timestamp
+	timestamp := time.Now().Format("20060102-150405")
+	backupPath := filePath + ".backup." + timestamp
+
+	// Copy file to backup location
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file for backup: %w", err)
+	}
+
+	if err := os.WriteFile(backupPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
 	return nil

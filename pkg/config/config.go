@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // Manager handles configuration operations
@@ -77,6 +78,8 @@ func (m *Manager) Get(key string) (string, ConfigSource, error) {
 	case "file_resolution", "fileresolution":
 		// For array values, return as comma-separated string
 		return strings.Join(report.FileResolution.Value, ","), report.FileResolution.Source, nil
+	case "backup_on_write", "backuponwrite":
+		return report.BackupOnWrite.Value, report.BackupOnWrite.Source, nil
 	default:
 		return "", "", fmt.Errorf("unknown configuration key: %s", key)
 	}
@@ -111,6 +114,12 @@ func (m *Manager) GetReport() (*ConfigReport, error) {
 		return nil, err
 	}
 
+	// Convert boolean to string for consistent reporting
+	backupOnWriteStr := "false"
+	if defaults.BackupOnWrite {
+		backupOnWriteStr = "true"
+	}
+
 	report := &ConfigReport{
 		Keystore:       ConfigValue{Value: defaults.Keystore, Source: SourceDefault},
 		File:           ConfigValue{Value: defaults.File, Source: SourceDefault},
@@ -118,6 +127,7 @@ func (m *Manager) GetReport() (*ConfigReport, error) {
 		Format:         ConfigValue{Value: defaults.Format, Source: SourceDefault},
 		KeyName:        ConfigValue{Value: defaults.KeyName, Source: SourceDefault},
 		FileResolution: ConfigArrayValue{Value: defaults.FileResolution, Source: SourceDefault},
+		BackupOnWrite:  ConfigValue{Value: backupOnWriteStr, Source: SourceDefault},
 	}
 
 	// Apply global config
@@ -140,6 +150,12 @@ func (m *Manager) GetReport() (*ConfigReport, error) {
 		if len(globalConfig.FileResolution) > 0 {
 			report.FileResolution = ConfigArrayValue{Value: globalConfig.FileResolution, Source: SourceGlobal}
 		}
+		// Always apply backup setting from global config
+		globalBackupStr := "false"
+		if globalConfig.BackupOnWrite {
+			globalBackupStr = "true"
+		}
+		report.BackupOnWrite = ConfigValue{Value: globalBackupStr, Source: SourceGlobal}
 	}
 
 	// Apply directory config (overrides global)
@@ -162,6 +178,12 @@ func (m *Manager) GetReport() (*ConfigReport, error) {
 		if len(dirConfig.FileResolution) > 0 {
 			report.FileResolution = ConfigArrayValue{Value: dirConfig.FileResolution, Source: SourceDirectory}
 		}
+		// Always apply backup setting from directory config
+		dirBackupStr := "false"
+		if dirConfig.BackupOnWrite {
+			dirBackupStr = "true"
+		}
+		report.BackupOnWrite = ConfigValue{Value: dirBackupStr, Source: SourceDirectory}
 	}
 
 	return report, nil
@@ -280,6 +302,10 @@ func (m *Manager) setConfigValue(config *Config, key, value string) error {
 			}
 		}
 		v.FieldByName("FileResolution").Set(reflect.ValueOf(filtered))
+	case "backup_on_write", "backuponwrite":
+		// Parse boolean values
+		boolVal := strings.ToLower(value) == "true" || value == "1"
+		v.FieldByName("BackupOnWrite").SetBool(boolVal)
 	default:
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
@@ -294,7 +320,8 @@ func (m *Manager) isConfigEmpty(config *Config) bool {
 		config.Name == "" &&
 		config.Format == "" &&
 		config.KeyName == "" &&
-		len(config.FileResolution) == 0
+		len(config.FileResolution) == 0 &&
+		!config.BackupOnWrite // BackupOnWrite defaults to true, so false means it was explicitly set
 }
 
 // ResolveFile resolves the actual file to use based on configuration
@@ -352,4 +379,38 @@ func buildFilename(file, name string) string {
 	}
 
 	return file + "." + name
+}
+
+// createBackup creates a timestamped backup of a file if it exists
+func (m *Manager) createBackup(filePath string) error {
+	// Check if backup is enabled
+	config, err := m.GetEffectiveConfig()
+	if err != nil {
+		return err
+	}
+
+	if !config.BackupOnWrite {
+		return nil // Backup disabled
+	}
+
+	// Check if original file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return nil // No file to backup
+	}
+
+	// Create backup filename with timestamp
+	timestamp := time.Now().Format("20060102-150405")
+	backupPath := filePath + ".backup." + timestamp
+
+	// Copy file to backup location
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file for backup: %w", err)
+	}
+
+	if err := os.WriteFile(backupPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+
+	return nil
 }
