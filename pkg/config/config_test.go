@@ -22,8 +22,8 @@ func TestDefaultConfig(t *testing.T) {
 	if config.Format != "env" {
 		t.Errorf("Expected default format to be 'env', got '%s'", config.Format)
 	}
-	if config.KeyName != "default" {
-		t.Errorf("Expected default key_name to be 'default', got '%s'", config.KeyName)
+	if config.KeyName != "envx.test" {
+		t.Errorf("Expected default key_name to be 'envx.test', got '%s'", config.KeyName)
 	}
 	if len(config.FileResolution) != 1 || config.FileResolution[0] != ".env" {
 		t.Errorf("Expected default file_resolution to be ['.env'], got %v", config.FileResolution)
@@ -39,7 +39,7 @@ func TestConfigMerge(t *testing.T) {
 		File:           ".env",
 		Name:           "",
 		Format:         "env",
-		KeyName:        "default",
+		KeyName:        "envx.test",
 		FileResolution: []string{".env"},
 		BackupOnWrite:  true,
 	}
@@ -67,8 +67,8 @@ func TestConfigMerge(t *testing.T) {
 	if base.File != ".env" {
 		t.Errorf("Expected file to remain '.env', got '%s'", base.File)
 	}
-	if base.KeyName != "default" {
-		t.Errorf("Expected key_name to remain 'default', got '%s'", base.KeyName)
+	if base.KeyName != "envx.test" {
+		t.Errorf("Expected key_name to remain 'envx.test', got '%s'", base.KeyName)
 	}
 	if len(base.FileResolution) != 2 || base.FileResolution[0] != ".env.local" {
 		t.Errorf("Expected file_resolution to be overridden to ['.env.local', '.env'], got %v", base.FileResolution)
@@ -275,8 +275,8 @@ func TestManagerGetReport(t *testing.T) {
 			report.File.Value, report.File.Source)
 	}
 
-	if report.KeyName.Value != "default" || report.KeyName.Source != SourceDefault {
-		t.Errorf("Expected key_name 'default' from default, got '%s' from '%s'",
+	if report.KeyName.Value != "envx.test" || report.KeyName.Source != SourceDefault {
+		t.Errorf("Expected key_name 'envx.test' from default, got '%s' from '%s'",
 			report.KeyName.Value, report.KeyName.Source)
 	}
 }

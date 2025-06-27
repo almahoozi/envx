@@ -94,6 +94,7 @@ type encryptOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	FmtOpts  *fmtOpts
 	Write    bool
 }
@@ -103,6 +104,7 @@ type decryptOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	FmtOpts  *fmtOpts
 	Write    bool
 }
@@ -112,6 +114,7 @@ type addOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	FmtOpts  *fmtOpts
 	print    bool
 }
@@ -121,6 +124,7 @@ type setOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	FmtOpts  *fmtOpts
 	print    bool
 }
@@ -130,6 +134,7 @@ type getOpts struct {
 	File       string
 	KeyStore   string
 	Password   string
+	KeyName    string
 	FmtOpts    *fmtOpts
 	ValuesOnly bool
 }
@@ -139,6 +144,7 @@ type getVOpts struct {
 	File      string
 	KeyStore  string
 	Password  string
+	KeyName   string
 	Separator string
 }
 
@@ -147,6 +153,7 @@ type runOpts struct {
 	File     string
 	KeyStore string
 	Password string
+	KeyName  string
 	Args     []string
 }
 
@@ -177,6 +184,9 @@ func applyConfigToRunOpts(opts *runOpts) error {
 	if opts.KeyStore == "" {
 		opts.KeyStore = cfg.Keystore
 	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
 
 	return nil
 }
@@ -198,6 +208,9 @@ func applyConfigToGetOpts(opts *getOpts) error {
 	}
 	if opts.KeyStore == "" {
 		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
 	}
 
 	return nil
@@ -221,6 +234,9 @@ func applyConfigToGetVOpts(opts *getVOpts) error {
 	if opts.KeyStore == "" {
 		opts.KeyStore = cfg.Keystore
 	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
 
 	return nil
 }
@@ -242,6 +258,9 @@ func applyConfigToSetOpts(opts *setOpts) error {
 	}
 	if opts.KeyStore == "" {
 		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
 	}
 
 	return nil
@@ -265,6 +284,9 @@ func applyConfigToAddOpts(opts *addOpts) error {
 	if opts.KeyStore == "" {
 		opts.KeyStore = cfg.Keystore
 	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
 
 	return nil
 }
@@ -287,6 +309,9 @@ func applyConfigToEncryptOpts(opts *encryptOpts) error {
 	if opts.KeyStore == "" {
 		opts.KeyStore = cfg.Keystore
 	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
+	}
 
 	return nil
 }
@@ -308,6 +333,9 @@ func applyConfigToDecryptOpts(opts *decryptOpts) error {
 	}
 	if opts.KeyStore == "" {
 		opts.KeyStore = cfg.Keystore
+	}
+	if opts.KeyName == "" {
+		opts.KeyName = cfg.KeyName
 	}
 
 	return nil
@@ -450,7 +478,7 @@ func getVCmdFn(ctx context.Context, opts getVOpts, args ...string) error {
 		return fmt.Errorf("error resolving file: %w", err)
 	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -494,7 +522,7 @@ func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
 	}
 
 	if opts.ValuesOnly {
-		return getVCmdFn(ctx, getVOpts{opts.Name, opts.File, opts.KeyStore, opts.Password, "\n"}, args...)
+		return getVCmdFn(ctx, getVOpts{opts.Name, opts.File, opts.KeyStore, opts.Password, opts.KeyName, "\n"}, args...)
 	}
 
 	format, err := opts.FmtOpts.Format()
@@ -511,7 +539,7 @@ func getCmdFn(ctx context.Context, opts getOpts, args ...string) error {
 		return fmt.Errorf("error resolving file: %w", err)
 	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -575,7 +603,7 @@ func setCmdFn(ctx context.Context, opts setOpts, args ...string) error {
 		return fmt.Errorf("error resolving file: %w", err)
 	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -663,7 +691,7 @@ func addCmdFn(ctx context.Context, opts addOpts, args ...string) error {
 		return fmt.Errorf("error resolving file: %w", err)
 	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -760,7 +788,7 @@ func encryptCmd(ctx context.Context, opts encryptOpts, args ...string) error {
 		return fmt.Errorf("error resolving file: %w", err)
 	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -840,7 +868,7 @@ func decryptCmd(ctx context.Context, opts decryptOpts, args ...string) error {
 		return fmt.Errorf("error resolving file: %w", err)
 	}
 
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}
@@ -918,7 +946,7 @@ func run(ctx context.Context, opts runOpts, args ...string) error {
 	}
 
 	// TODO: Move out
-	key, err := loadKeyWithStringTypeAndPassword(opts.KeyStore, opts.Password)
+	key, err := loadKeyWithStringTypePasswordAndKeyName(opts.KeyStore, opts.Password, opts.KeyName)
 	if err != nil {
 		return fmt.Errorf("error loading key: %w", err)
 	}

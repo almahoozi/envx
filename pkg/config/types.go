@@ -18,7 +18,7 @@ func DefaultConfig() *Config {
 		File:           ".env",
 		Name:           "",
 		Format:         "env",
-		KeyName:        "default",
+		KeyName:        "envx.test",
 		FileResolution: []string{".env"},
 		BackupOnWrite:  true, // Default to true for safety
 	}
