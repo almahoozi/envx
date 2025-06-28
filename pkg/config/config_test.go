@@ -28,8 +28,8 @@ func TestDefaultConfig(t *testing.T) {
 	if len(config.FileResolution) != 1 || config.FileResolution[0] != ".env" {
 		t.Errorf("Expected default file_resolution to be ['.env'], got %v", config.FileResolution)
 	}
-	if !config.BackupOnWrite {
-		t.Errorf("Expected default backup_on_write to be true, got %v", config.BackupOnWrite)
+	if config.BackupOnWrite {
+		t.Errorf("Expected default backup_on_write to be false, got %v", config.BackupOnWrite)
 	}
 }
 
@@ -41,7 +41,7 @@ func TestConfigMerge(t *testing.T) {
 		Format:         "env",
 		KeyName:        "envx.test",
 		FileResolution: []string{".env"},
-		BackupOnWrite:  true,
+		BackupOnWrite:  false,
 	}
 
 	override := &Config{
@@ -74,7 +74,7 @@ func TestConfigMerge(t *testing.T) {
 		t.Errorf("Expected file_resolution to be overridden to ['.env.local', '.env'], got %v", base.FileResolution)
 	}
 	if base.BackupOnWrite != false {
-		t.Errorf("Expected backup_on_write to be overridden to false, got %v", base.BackupOnWrite)
+		t.Errorf("Expected backup_on_write to remain false, got %v", base.BackupOnWrite)
 	}
 }
 
