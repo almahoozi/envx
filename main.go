@@ -67,6 +67,11 @@ func loadKeyWithStringType(storeTypeStr string) ([]byte, error) {
 
 // loadKeyWithStringTypeAndPassword loads or creates an encryption key using the specified keystore type string and password
 func loadKeyWithStringTypeAndPassword(storeTypeStr, password string) ([]byte, error) {
+	return loadKeyWithStringTypePasswordAndKeyName(storeTypeStr, password, "")
+}
+
+// loadKeyWithStringTypePasswordAndKeyName loads or creates an encryption key using the specified keystore type string, password, and key name
+func loadKeyWithStringTypePasswordAndKeyName(storeTypeStr, password, keyName string) ([]byte, error) {
 	// As a workaround we set the password to byte(1) if it is empty using -P
 	if password == emptyPassword {
 		storeTypeStr = "password"
@@ -82,7 +87,7 @@ func loadKeyWithStringTypeAndPassword(storeTypeStr, password string) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	return loadKeyWithTypeAndPassword(storeType, password)
+	return loadKeyWithTypePasswordAndKeyName(storeType, password, keyName)
 }
 
 // parseKeyStoreType converts a string to KeyStoreType
@@ -106,6 +111,11 @@ func loadKeyWithType(storeType KeyStoreType) ([]byte, error) {
 
 // loadKeyWithTypeAndPassword loads or creates an encryption key using the specified keystore type and optional password
 func loadKeyWithTypeAndPassword(storeType KeyStoreType, password string) ([]byte, error) {
+	return loadKeyWithTypePasswordAndKeyName(storeType, password, "")
+}
+
+// loadKeyWithTypePasswordAndKeyName loads or creates an encryption key using the specified keystore type, password, and key name
+func loadKeyWithTypePasswordAndKeyName(storeType KeyStoreType, password, keyName string) ([]byte, error) {
 	user, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user: %w", err)
@@ -128,8 +138,14 @@ func loadKeyWithTypeAndPassword(storeType KeyStoreType, password string) ([]byte
 		case KeyStoreTypeMacOS:
 			fallthrough
 		default:
-			// Use test config if set (for testing), otherwise use default
+			// Use test config if set (for testing), otherwise create config with key name
 			config := testKeystoreConfig
+			if config == nil && keyName != "" {
+				config = &keystore.Config{
+					App:     keyName,
+					Service: "com.almahoozi.envx",
+				}
+			}
 			store = keystore.NewMacOSKeyStore(config)
 		}
 	}
